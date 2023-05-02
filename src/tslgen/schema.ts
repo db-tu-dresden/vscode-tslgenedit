@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { SerializerUtils } from '../utils/serialize';
-export namespace TVLGeneratorSchema {
+export namespace TSLGeneratorSchema {
     export interface SchemaFileLocations {
         extension: vscode.Uri;
         primitive: vscode.Uri;
@@ -11,7 +11,7 @@ export namespace TVLGeneratorSchema {
         primitive: any,
         primitiveClass: any
     };
-    export const tvlGeneratorTopLevelEntryNames: { [key: string]: string } = {
+    export const tslGeneratorTopLevelEntryNames: { [key: string]: string } = {
         extension: "extension",
         primitive: "primitive",
         primitiveClass: "primitive_class"

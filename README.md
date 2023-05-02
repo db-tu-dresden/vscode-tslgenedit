@@ -29,6 +29,14 @@ Currently, only primitive definitions can be rendered.
 
 Initial release.
 
+### 0.0.2
+
+Improved Preview.
+
+### 0.0.3
+
+Refactored Library name from TVL to TSL.
+
 ### Acknowledgments
 
 Thanks to Alexander Krause for getting the web view and rendering up and running. 

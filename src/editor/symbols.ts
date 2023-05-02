@@ -2,8 +2,8 @@ import * as vscode from 'vscode';
 import * as yaml from 'yaml';
 import { SerializerUtils } from '../utils/serialize';
 
-export namespace TVLEditorFileSymbols {
-    export function getTVLExtensionDocumentSymbols(
+export namespace TSLEditorFileSymbols {
+    export function getTSLExtensionDocumentSymbols(
         currentDocument: vscode.TextDocument, documents: SerializerUtils.YamlDocument[]
     ): vscode.DocumentSymbol[] {
         const _symbols: vscode.DocumentSymbol[] = [];
@@ -26,7 +26,7 @@ export namespace TVLEditorFileSymbols {
         return _symbols;
     }
 
-    export function getTVLPrimitiveDocumentSymbols(
+    export function getTSLPrimitiveDocumentSymbols(
         currentDocument: vscode.TextDocument, documents: SerializerUtils.YamlDocument[]
     ): vscode.DocumentSymbol[] {
         const _symbols: vscode.DocumentSymbol[] = [];

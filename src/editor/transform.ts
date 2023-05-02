@@ -1,11 +1,11 @@
 import * as vscode from 'vscode';
 import { FileSystemUtils } from '../utils/files';
-import { TVLGeneratorTemplate } from '../tvlgen/template_transform';
-import { TVLGeneratorSchema } from '../tvlgen/schema';
+import { TSLGeneratorTemplate } from '../tslgen/template_transform';
+import { TSLGeneratorSchema } from '../tslgen/schema';
 import { SerializerUtils } from '../utils/serialize';
 import { TypeUtils } from '../utils/types';
 
-export namespace TVLEditorTransformation {
+export namespace TSLEditorTransformation {
     export interface TransformationTarget {
         sourceFile: vscode.Uri;
         targetFolder: vscode.Uri;
@@ -32,7 +32,7 @@ export namespace TVLEditorTransformation {
                 if (FileSystemUtils.filename(entry.sourceFile).startsWith("primitive_declaration")) {
                     // console.log("NOW");
                 }
-                const _updatedTemplateStr: string = TVLGeneratorTemplate.Jinja2ToTwing.transform(_origTemplateStr);
+                const _updatedTemplateStr: string = TSLGeneratorTemplate.Jinja2ToTwing.transform(_origTemplateStr);
                 if (_updatedTemplateStr.length === 0) {
                     return false;
                 }
@@ -46,7 +46,7 @@ export namespace TVLEditorTransformation {
         return await vscode.window.withProgress(progressOptions, progressCallback);
     }
 
-    export async function transformSchema(transformationTarget: TransformationTarget, persist: boolean = true): Promise<TVLGeneratorSchema.SchemaFileLocations|TVLGeneratorSchema.Schemata|undefined> {
+    export async function transformSchema(transformationTarget: TransformationTarget, persist: boolean = true): Promise<TSLGeneratorSchema.SchemaFileLocations|TSLGeneratorSchema.Schemata|undefined> {
         const progressOptions = { location: vscode.ProgressLocation.Notification, title: `Transforming Schema...` };
         const progressCallback = async (progress: vscode.Progress<{ message?: string; }>) => {
             progress.report({ message: `Reading ${transformationTarget.sourceFile.fsPath}...` });
@@ -62,21 +62,21 @@ export namespace TVLEditorTransformation {
                 return undefined;
             }
             const _jsonDocument = _jsonDocuments[0];
-            if (!Object.values(TVLGeneratorSchema.tvlGeneratorTopLevelEntryNames).every(key => _jsonDocument.hasOwnProperty(key))) {
+            if (!Object.values(TSLGeneratorSchema.tslGeneratorTopLevelEntryNames).every(key => _jsonDocument.hasOwnProperty(key))) {
                 console.error("Required keys were not present in schema.");
                 return undefined;
             }
-            const _extensionSchema = _jsonDocument[TVLGeneratorSchema.tvlGeneratorTopLevelEntryNames["extension"]];
+            const _extensionSchema = _jsonDocument[TSLGeneratorSchema.tslGeneratorTopLevelEntryNames["extension"]];
             progress.report({ message: `Transforming extension schema...` });
-            const _transformedExtensionSchema = TVLGeneratorSchema.SchemaTransform.transform(_extensionSchema);
+            const _transformedExtensionSchema = TSLGeneratorSchema.SchemaTransform.transform(_extensionSchema);
             
 
-            const _primitiveSchema = _jsonDocument[TVLGeneratorSchema.tvlGeneratorTopLevelEntryNames["primitive"]];
-            const _primitiveClassSchema = _jsonDocument[TVLGeneratorSchema.tvlGeneratorTopLevelEntryNames["primitiveClass"]];
+            const _primitiveSchema = _jsonDocument[TSLGeneratorSchema.tslGeneratorTopLevelEntryNames["primitive"]];
+            const _primitiveClassSchema = _jsonDocument[TSLGeneratorSchema.tslGeneratorTopLevelEntryNames["primitiveClass"]];
             progress.report({ message: `Transforming primitive schema...` });
-            const _transformedPrimitiveSchema = TVLGeneratorSchema.SchemaTransform.transform(_primitiveSchema);
+            const _transformedPrimitiveSchema = TSLGeneratorSchema.SchemaTransform.transform(_primitiveSchema);
             progress.report({ message: `Transforming primitive-class schema...` });
-            const _transformedPrimitiveClassSchema = TVLGeneratorSchema.SchemaTransform.transform(_primitiveClassSchema);
+            const _transformedPrimitiveClassSchema = TSLGeneratorSchema.SchemaTransform.transform(_primitiveClassSchema);
             progress.report({ message: `Combining primitive and primitive-class schema...` });
             const _finalPrimitiveSchema = TypeUtils.extendObjects(_transformedPrimitiveSchema, _transformedPrimitiveClassSchema);
             
@@ -122,21 +122,21 @@ export namespace TVLEditorTransformation {
             return undefined;
         }
         const _jsonDocument = _jsonDocuments[0];
-        if (!Object.values(TVLGeneratorSchema.tvlGeneratorTopLevelEntryNames).every(key => _jsonDocument.hasOwnProperty(key))) {
+        if (!Object.values(TSLGeneratorSchema.tslGeneratorTopLevelEntryNames).every(key => _jsonDocument.hasOwnProperty(key))) {
             console.error("Required keys were not present in schema.");
             return undefined;
         }
-        const _extensionSchema = TVLGeneratorSchema.SchemaTransform.filterDefaults(_jsonDocument[TVLGeneratorSchema.tvlGeneratorTopLevelEntryNames["extension"]]);
-        const _extensionDefaults = TVLGeneratorSchema.SchemaTransform.createDefaultEntryFromSchema(_extensionSchema);
-        const _primitiveSchema = _jsonDocument[TVLGeneratorSchema.tvlGeneratorTopLevelEntryNames["primitive"]];
+        const _extensionSchema = TSLGeneratorSchema.SchemaTransform.filterDefaults(_jsonDocument[TSLGeneratorSchema.tslGeneratorTopLevelEntryNames["extension"]]);
+        const _extensionDefaults = TSLGeneratorSchema.SchemaTransform.createDefaultEntryFromSchema(_extensionSchema);
+        const _primitiveSchema = _jsonDocument[TSLGeneratorSchema.tslGeneratorTopLevelEntryNames["primitive"]];
         const _primitiveDefinition = {..._primitiveSchema['optional']['definitions']['entry_type']};
         delete _primitiveSchema['definitions'];
         const _primitiveDeclaration = _primitiveSchema;
-        const _primitiveDefinitionFiltered = TVLGeneratorSchema.SchemaTransform.filterDefaults(_primitiveDefinition);
-        const _primitiveDeclarationFiltered = TVLGeneratorSchema.SchemaTransform.filterDefaults(_primitiveDeclaration);
+        const _primitiveDefinitionFiltered = TSLGeneratorSchema.SchemaTransform.filterDefaults(_primitiveDefinition);
+        const _primitiveDeclarationFiltered = TSLGeneratorSchema.SchemaTransform.filterDefaults(_primitiveDeclaration);
 
-        const _primitiveDeclarationDefaults = TVLGeneratorSchema.SchemaTransform.createDefaultEntryFromSchema(_primitiveDeclarationFiltered);
-        const _primitiveDefinitionDefaults = TVLGeneratorSchema.SchemaTransform.createDefaultEntryFromSchema(_primitiveDefinitionFiltered);
+        const _primitiveDeclarationDefaults = TSLGeneratorSchema.SchemaTransform.createDefaultEntryFromSchema(_primitiveDeclarationFiltered);
+        const _primitiveDefinitionDefaults = TSLGeneratorSchema.SchemaTransform.createDefaultEntryFromSchema(_primitiveDefinitionFiltered);
         return {
             extension: _extensionDefaults,
             primitiveDeclaration: _primitiveDeclarationDefaults,

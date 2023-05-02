@@ -1,4 +1,4 @@
-export namespace TVLGeneratorTemplate {
+export namespace TSLGeneratorTemplate {
     export namespace Jinja2ToTwing {
         namespace details {
             interface CompiledTemplate {

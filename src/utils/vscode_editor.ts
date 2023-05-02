@@ -1,7 +1,7 @@
 
 import * as vscode from 'vscode';
 import { SerializerUtils } from './serialize';
-import { TVLGeneratorSchema } from '../tvlgen/schema';
+import { TSLGeneratorSchema } from '../tslgen/schema';
 
 export namespace EditorUtils {
     export function isActiveEditor(): boolean {

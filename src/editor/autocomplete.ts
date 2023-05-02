@@ -1,13 +1,13 @@
 // import * as yaml from 'vscode-yaml';
 import * as yaml from 'yaml';
 import { CompletionItem, CompletionItemKind, CompletionItemProvider, TextDocument, Position, CancellationToken, SnippetString, MarkdownString, TextEdit } from 'vscode';
-import { TVLGeneratorModel } from '../tvlgen/model';
+import { TSLGeneratorModel } from '../tslgen/model';
 import { SerializerUtils } from '../utils/serialize';
-import { tvlEditorExtension } from './editor_extension';
+import { tslEditorExtension } from './editor_extension';
 import { resolve } from 'path';
 import { rejects } from 'assert';
 
-export namespace TVLEditorAutoComplete {
+export namespace TSLEditorAutoComplete {
 
     // export class 
 
@@ -33,7 +33,7 @@ export namespace TVLEditorAutoComplete {
             return _result.join("\n");
         }
         public provideCompletionItems(document: TextDocument, position: Position, token: CancellationToken): Promise<CompletionItem[]> {
-            const _schema = tvlEditorExtension.getSchema(document.uri);
+            const _schema = tslEditorExtension.getSchema(document.uri);
 
             if(!_schema) {
                 return new Promise((resolve, reject) => { return []; });
@@ -41,14 +41,14 @@ export namespace TVLEditorAutoComplete {
             let _currentSchema: any;
 
             
-            const _documentType = TVLGeneratorModel.determineFileTypeByLocation(document.uri);
+            const _documentType = TSLGeneratorModel.determineFileTypeByLocation(document.uri);
             
-            if (_documentType === TVLGeneratorModel.TVLDataFileContentType.unknown) {
+            if (_documentType === TSLGeneratorModel.TSLDataFileContentType.unknown) {
                 return new Promise((resolve, reject) => { return []; });
             }
-            if (_documentType === TVLGeneratorModel.TVLDataFileContentType.extension) {
+            if (_documentType === TSLGeneratorModel.TSLDataFileContentType.extension) {
                 _currentSchema = _schema.extension;
-            } else if (_documentType === TVLGeneratorModel.TVLDataFileContentType.primitive) {
+            } else if (_documentType === TSLGeneratorModel.TSLDataFileContentType.primitive) {
                 _currentSchema = _schema.primitive;
             }
             const _schemaPropertyKeys = 

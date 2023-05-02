@@ -3,15 +3,15 @@ import { TwingEnvironment, TwingLoaderFilesystem, TwingCacheFilesystem, TwingSou
 import * as yaml from 'yaml';
 import * as crypto from 'crypto';
 
-import { TVLGeneratorModel } from "../tvlgen/model";
+import { TSLGeneratorModel } from "../tslgen/model";
 import { SerializerUtils } from '../utils/serialize';
 import { FileSystemUtils } from '../utils/files';
-import { TVLEditorTransformation } from './transform';
+import { TSLEditorTransformation } from './transform';
 import { TypeUtils } from '../utils/types';
 import { EditorUtils } from '../utils/vscode_editor';
 
-export namespace TVLEditorPreview {
-    export enum TVLDataType {
+export namespace TSLEditorPreview {
+    export enum TSLDataType {
         primitiveDefinition = 0,
         primitiveDeclaration = 1,
         primitiveClass = 2,
@@ -20,13 +20,13 @@ export namespace TVLEditorPreview {
     };
     export interface RenderedString {
         content: string;
-        tvlType: TVLDataType;
+        tslType: TSLDataType;
         ctype?: string;
     }
     export function emptyRenderedString(): RenderedString {
         return {
             content: "",
-            tvlType: TVLDataType.unknown
+            tslType: TSLDataType.unknown
         };
     }
 
@@ -128,8 +128,8 @@ export namespace TVLEditorPreview {
 
     
 
-    async function getTVLExtensionDocument(tvlSpecs: TVLGeneratorModel.TVLGeneratorSpecs, extensionName: string): Promise<undefined | SerializerUtils.YamlDocument> {
-        for (const _extensionFile of await FileSystemUtils.iterFiles(tvlSpecs.tvlgenExtensionDataFolder, TVLGeneratorModel.tvlGenDataFileExtension)) {
+    async function getTSLExtensionDocument(tslSpecs: TSLGeneratorModel.TSLGeneratorSpecs, extensionName: string): Promise<undefined | SerializerUtils.YamlDocument> {
+        for (const _extensionFile of await FileSystemUtils.iterFiles(tslSpecs.tslgenExtensionDataFolder, TSLGeneratorModel.tslGenDataFileExtension)) {
             const _extensionFileText = await FileSystemUtils.readFile(_extensionFile.uri);
             if (_extensionFileText.length === 0) {
                 continue;
@@ -152,31 +152,31 @@ export namespace TVLEditorPreview {
     }
 
     export async function renderSelection(
-        tvlSpecs: TVLGeneratorModel.TVLGeneratorSpecs,
-        defaults: TVLEditorTransformation.DefaultsFromSchema,
+        tslSpecs: TSLGeneratorModel.TSLGeneratorSpecs,
+        defaults: TSLEditorTransformation.DefaultsFromSchema,
         currentDocument: vscode.TextDocument,
         documents: SerializerUtils.YamlDocument[],
         cursorPosition: vscode.Position
     ): Promise<RenderedString[]> {
-        const _fileType = TVLGeneratorModel.determineDataFileType(documents);
-        if (_fileType === TVLGeneratorModel.TVLDataFileContentType.unknown) {
-            return [{ content: "", tvlType: TVLDataType.unknown }];
+        const _fileType = TSLGeneratorModel.determineDataFileType(documents);
+        if (_fileType === TSLGeneratorModel.TSLDataFileContentType.unknown) {
+            return [{ content: "", tslType: TSLDataType.unknown }];
         }
         const _data = SerializerUtils.Search.getCurrentFocusedYamlDocument(documents, currentDocument, cursorPosition);
         if (!_data) {
-            return [{ content: "", tvlType: TVLDataType.unknown }];
+            return [{ content: "", tslType: TSLDataType.unknown }];
         }
-        if (_fileType === TVLGeneratorModel.TVLDataFileContentType.extension) {
+        if (_fileType === TSLGeneratorModel.TSLDataFileContentType.extension) {
             return [{
                 content: await templateManager.render(
-                    tvlSpecs.tvlgenTemplateRootFolder, 
-                    `@core/extension${TVLEditorTransformation.templateFileExtension}`, 
+                    tslSpecs.tslgenTemplateRootFolder, 
+                    `@core/extension${TSLEditorTransformation.templateFileExtension}`, 
                     TypeUtils.extendObjects(_data.toJSON(), defaults.extension)),
-                tvlType: TVLDataType.extension
+                tslType: TSLDataType.extension
             }];
         }
 
-        if (_fileType === TVLGeneratorModel.TVLDataFileContentType.primitive) {
+        if (_fileType === TSLGeneratorModel.TSLDataFileContentType.primitive) {
             const _functorName = _data.get("functor_name");
             if (!_functorName) {
                 _data.set("functor_name", `${_data.get("primitive_name")}`);
@@ -210,11 +210,11 @@ export namespace TVLEditorPreview {
             if (!_selectedDefinitionItem) {
                 return [{
                     content: await templateManager.render(
-                        tvlSpecs.tvlgenTemplateRootFolder, 
-                        `@core/primitive_declaration${TVLEditorTransformation.templateFileExtension}`, 
+                        tslSpecs.tslgenTemplateRootFolder, 
+                        `@core/primitive_declaration${TSLEditorTransformation.templateFileExtension}`, 
                         TypeUtils.extendObjects(_declarationJson,defaults.primitiveDeclaration) 
                     ),
-                    tvlType: TVLDataType.primitiveDeclaration
+                    tslType: TSLDataType.primitiveDeclaration
                 }];
             } else {
                 const _definition = _selectedDefinitionItem as yaml.YAMLMap<unknown, unknown>;
@@ -222,21 +222,21 @@ export namespace TVLEditorPreview {
                 if (!_ctypes) {
                     return [{
                         content: "Please specify a ctype.",
-                        tvlType: TVLDataType.unknown
+                        tslType: TSLDataType.unknown
                     }];
                 }
                 const _extensionNameItem = _definition.get("target_extension");
                 if (!_extensionNameItem) {
                     return [{
                         content: "Please specify an extension.",
-                        tvlType: TVLDataType.unknown
+                        tslType: TSLDataType.unknown
                     }];
                 }
                 const _flags = _definition.get("lscpu_flags");
                 const _flagsStr: string = (_flags) ? ((yaml.isCollection(_flags)) ? _flags.items.join(", ") : `${_flags}`) : "";
                 _definition.set("lscpu_flags", _flagsStr);
                 const _extensionName = `${_extensionNameItem}`;
-                const _extensionData = await getTVLExtensionDocument(tvlSpecs, _extensionName);
+                const _extensionData = await getTSLExtensionDocument(tslSpecs, _extensionName);
 
                 const _extensionDataJson = ((_extensionData) && (yaml.isDocument(_extensionData))) ? _extensionData.toJSON() : {};
 
@@ -258,7 +258,7 @@ export namespace TVLEditorPreview {
                         currentDataJson["implementation"] = await templateManager.renderString(currentDataJson["implementation"], currentDataJson, ctype);
                     } catch (err) {
                         console.error(err);
-                        return { content: "", tvlType: TVLDataType.primitiveDefinition, ctype: ctype};
+                        return { content: "", tslType: TSLDataType.primitiveDefinition, ctype: ctype};
                     }
 
                     // _definition.set("ctype", ctype);
@@ -270,16 +270,16 @@ export namespace TVLEditorPreview {
                     try {
                         return {
                             content: await templateManager.render(
-                                tvlSpecs.tvlgenTemplateRootFolder,
-                                `@core/primitive_definition${TVLEditorTransformation.templateFileExtension}`,
+                                tslSpecs.tslgenTemplateRootFolder,
+                                `@core/primitive_definition${TSLEditorTransformation.templateFileExtension}`,
                                 currentDataJson
                             ),
-                            tvlType: TVLDataType.primitiveDefinition,
+                            tslType: TSLDataType.primitiveDefinition,
                             ctype: ctype
                         };
                     } catch (err) {
                         console.error(err);
-                        return { content: "", tvlType: TVLDataType.primitiveDefinition, ctype: ctype};
+                        return { content: "", tslType: TSLDataType.primitiveDefinition, ctype: ctype};
                     }
                 }));
                 return _renderedDefinitions;
@@ -287,13 +287,13 @@ export namespace TVLEditorPreview {
         }
         return [{
             content: "",
-            tvlType: TVLDataType.extension
+            tslType: TSLDataType.extension
         }];
     }
 
 
-    export class TVLGenViewProvider implements vscode.WebviewViewProvider {
-        public static readonly viewType = 'tslgenedit.generatedCodePreview';
+    export class TSLGenViewProvider implements vscode.WebviewViewProvider {
+        public static readonly viewType = 'tslgen-edit.generatedCodePreview';
         private _view?: vscode.WebviewView;
         private latestContent: RenderedString[] = [emptyRenderedString()];
         constructor(

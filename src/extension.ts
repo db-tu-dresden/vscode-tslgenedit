@@ -1,56 +1,56 @@
 import * as vscode from 'vscode';
-import { TVLEditorPreview } from './editor/preview';
-import { tvlEditorExtension } from './editor/editor_extension';
-import { TVLEditorAutoComplete } from './editor/autocomplete';
+import { TSLEditorPreview } from './editor/preview';
+import { tslEditorExtension } from './editor/editor_extension';
+import { TSLEditorAutoComplete } from './editor/autocomplete';
 
-// let tvlPreviewPanel: vscode.WebviewPanel | undefined;
+// let tslPreviewPanel: vscode.WebviewPanel | undefined;
 
 
 
 export async function activate(context: vscode.ExtensionContext) {
 
-    const provider = new TVLEditorPreview.TVLGenViewProvider(context.extensionUri, context);
+    const provider = new TSLEditorPreview.TSLGenViewProvider(context.extensionUri, context);
 
-    context.subscriptions.push(vscode.window.registerWebviewViewProvider(TVLEditorPreview.TVLGenViewProvider.viewType, provider));
+    context.subscriptions.push(vscode.window.registerWebviewViewProvider(TSLEditorPreview.TSLGenViewProvider.viewType, provider));
 
     context.subscriptions.push(
         vscode.languages.registerCompletionItemProvider(
             { scheme: 'file', language: 'yaml' },
-            new TVLEditorAutoComplete.YAMLCompletionProvider(),
+            new TSLEditorAutoComplete.YAMLCompletionProvider(),
             // '\w'
             // '*'
             ...'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
         )
     );
 
-    context.subscriptions.push(vscode.commands.registerCommand('tslgen.preview', async () => {
-        await vscode.commands.executeCommand( `${TVLEditorPreview.TVLGenViewProvider.viewType}.focus` );
-        const _data = await tvlEditorExtension.renderCurrentSelection();
+    context.subscriptions.push(vscode.commands.registerCommand('tslgen-edit.preview', async () => {
+        await vscode.commands.executeCommand( `${TSLEditorPreview.TSLGenViewProvider.viewType}.focus` );
+        const _data = await tslEditorExtension.renderCurrentSelection();
 
         provider.setContent(_data);
     }));
 
     context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders((event) => {
-        tvlEditorExtension.update();
+        tslEditorExtension.update();
     }));
-    tvlEditorExtension.update();
+    tslEditorExtension.update();
 
     context.subscriptions.push(vscode.languages.registerDocumentSymbolProvider(
         { language: 'yaml' },
-        { provideDocumentSymbols: tvlEditorExtension.getDocumentSymbols },
-        { label: "TVLGenerator" }
+        { provideDocumentSymbols: tslEditorExtension.getDocumentSymbols },
+        { label: "TSLGenerator" }
     ));
 
     // vscode.commands.executeCommand('workbench.view.explorer');
 }
 
 
-// async function hideNonTVLGenEditFiles(): Promise<void> {
+// async function hideNonTSLGenEditFiles(): Promise<void> {
 //     const currentFolder = utils.getFocusedFolder();
 //     if (!currentFolder) {
 //         return;
 //     }
-//     const newExcludes: { [key: string]: boolean } = extension_utils.getTVLGeneratorSpecificExcludes(currentFolder);
+//     const newExcludes: { [key: string]: boolean } = extension_utils.getTSLGeneratorSpecificExcludes(currentFolder);
 //     const config = vscode.workspace.getConfiguration();
 //     const origFilesExclude = config.get<file_utils.FilesExclude>('files.exclude') ?? {};
 //     for (const k in origFilesExclude) {
@@ -59,17 +59,17 @@ export async function activate(context: vscode.ExtensionContext) {
 //     config.update("files.exclude", newExcludes, vscode.ConfigurationTarget.Workspace);
 //     vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
 // }
-// async function showNonTVLGenEditFiles(): Promise<void> {
+// async function showNonTSLGenEditFiles(): Promise<void> {
 //     const currentFolder = utils.getFocusedFolder();
 //     if (!currentFolder) {
 //         return;
 //     }
 //     const newExcludes: { [key: string]: boolean } = {};
-//     const tvlGenExlcudes: { [key: string]: boolean } = extension_utils.getTVLGeneratorSpecificExcludes(currentFolder);
+//     const tslGenExlcudes: { [key: string]: boolean } = extension_utils.getTSLGeneratorSpecificExcludes(currentFolder);
 //     const config = vscode.workspace.getConfiguration();
 //     const origFilesExclude = config.get<file_utils.FilesExclude>('files.exclude') ?? {};
 //     for (const k in origFilesExclude) {
-//         if (!(k in tvlGenExlcudes)) {
+//         if (!(k in tslGenExlcudes)) {
 //             newExcludes[k] = origFilesExclude[k];
 //         }
 //     }
@@ -79,12 +79,12 @@ export async function activate(context: vscode.ExtensionContext) {
 
 
 
-// function addNewTVLGeneratorFile() {
-//     if (!(extension_utils.isCurrentFolderATVLGeneratorFolder())) {
+// function addNewTSLGeneratorFile() {
+//     if (!(extension_utils.isCurrentFolderATSLGeneratorFolder())) {
 //         return;
 //     }
-//     const tvlGeneratorRootFolder = extension_utils.getTVLGeneratorRootFolder();
-//     if (!tvlGeneratorRootFolder) {
+//     const tslGeneratorRootFolder = extension_utils.getTSLGeneratorRootFolder();
+//     if (!tslGeneratorRootFolder) {
 //         return;
 //     }
 //     vscode.window.showQuickPick(["New Extension", "New PrimitiveClass"]).then(async (selectedItem) => {
@@ -94,13 +94,13 @@ export async function activate(context: vscode.ExtensionContext) {
 //             let placeHolder: string;
 //             log.outputDisplay.appendLine(selectedItem);
 //             switch (selectedItem) {
-//                 case "New TVL-Extension File":
-//                     basePath = file_utils.addStringToUri(tvlGeneratorRootFolder, "extension");
+//                 case "New TSL-Extension File":
+//                     basePath = file_utils.addStringToUri(tslGeneratorRootFolder, "extension");
 //                     value = "new-extension";
 //                     placeHolder = "Name of a new extension file (.yaml may be added)";
 //                     break;
 //                 default:
-//                     basePath = file_utils.addStringToUri(tvlGeneratorRootFolder, "primitives");
+//                     basePath = file_utils.addStringToUri(tslGeneratorRootFolder, "primitives");
 //                     value = "new-primitive-class";
 //                     placeHolder = "Name of a new primitive class file (.yaml may be added)";
 //                     break;

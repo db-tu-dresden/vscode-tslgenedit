@@ -2,8 +2,8 @@
   "name": "tslgen-edit",
   "displayName": "TSLGen-Editor",
   "description": "VSCode Editor Extension for editing TSL-Generator data files.",
-  "version": "0.0.2",
-  "publisher": "JPietrzykAKrause",
+  "version": "0.0.3",
+  "publisher": "DBTUD",
   "engines": {
     "vscode": "^1.77.0"
   },
@@ -23,7 +23,7 @@
       "explorer": [
         {
           "type": "webview",
-          "id": "tslgenedit.generatedCodePreview",
+          "id": "tslgen-edit.generatedCodePreview",
           "name": "TSLGen-Editor Code Preview"
         }
       ]
@@ -39,14 +39,14 @@
     ],
     "commands": [
       {
-        "command": "tslgen.preview",
+        "command": "tslgen-edit.preview",
         "title": "Render the currently selected section.",
         "category": "TSLGen-Editor"
       }
     ],
     "keybindings": [
       {
-        "command": "tslgen.preview",
+        "command": "tslgen-edit.preview",
         "key": "ctrl+alt+p",
         "mac": "cmd+alt+p",
         "when": "editorTextFocus"
@@ -56,7 +56,7 @@
   "menus": {
     "commandPalette": [
       {
-        "command": "extension.importTVLGeneratorProject",
+        "command": "tslgen-edit.importTVLGeneratorProject",
         "when": "editorTextFocus"
       }
     ]
