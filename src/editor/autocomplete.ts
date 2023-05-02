@@ -90,7 +90,7 @@ export namespace TVLEditorAutoComplete {
                     const _forwardTokenPresent = 
                         SerializerUtils.Search.searchFirstToken(
                             document, position, 
-                            SerializerUtils.Search.Direction.backward, "---", "...");
+                            SerializerUtils.Search.Direction.forward, "---", "...");
                     const _docStartToken = ((!_backwardTokenPresent) || (_backwardTokenPresent === "...")) ? "---" : '';
                     const _docEndToken   = ((!_forwardTokenPresent) || (_forwardTokenPresent === "---")) ? "..." : '';
                     const completionItem = new CompletionItem(`New ${_documentType.valueOf()}:`, CompletionItemKind.Class);
