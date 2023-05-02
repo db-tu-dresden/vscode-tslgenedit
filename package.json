@@ -60,7 +60,8 @@
   "dependencies": {
     "copy-webpack-plugin": "^11.0.0",
     "highlight.js": "^11.7.0",
-    "twing": "^6.0.0-alpha.1"
+    "twing": "^6.0.0-alpha.1",
+    "yaml": "^2.2.2"
   },
   "scripts": {
     "vscode:prepublish": "npm run package",

@@ -434,7 +434,8 @@ export namespace TVLEditorPreview {
             const indentChar = "   ";
             for (const line of lines) {
                 let trimmed = line.trim();
-                if (trimmed.startsWith("}") || trimmed.endsWith("}") || trimmed.endsWith("};")) {
+                const inline_brace_pair: Boolean = trimmed.includes("{") && trimmed.includes("}");
+                if ( !inline_brace_pair && (trimmed.startsWith("}") || trimmed.endsWith("}") || trimmed.endsWith("};"))) {
                     level--;
                 }
                 formatted += minIndent + indentChar.repeat(level) + trimmed + "\n";

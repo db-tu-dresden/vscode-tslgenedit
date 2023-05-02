@@ -24,6 +24,7 @@ export async function activate(context: vscode.ExtensionContext) {
     );
 
     context.subscriptions.push(vscode.commands.registerCommand('extension.preview', async () => {
+        await vscode.commands.executeCommand( `${TVLEditorPreview.TVLGenViewProvider.viewType}.focus` );
         const _data = await tvlEditorExtension.renderCurrentSelection();
 
         provider.setContent(_data);
