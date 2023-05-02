@@ -35,14 +35,14 @@
     ],
     "commands": [
       {
-        "command": "extension.preview",
+        "command": "tslgen.preview",
         "title": "Render the currently selected section.",
         "category": "TSLGen-Editor"
       }
     ],
     "keybindings": [
       {
-        "command": "extension.preview",
+        "command": "tslgen.preview",
         "key": "ctrl+alt+p",
         "mac": "cmd+alt+p",
         "when": "editorTextFocus"
