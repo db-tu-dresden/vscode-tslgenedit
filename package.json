@@ -2,8 +2,8 @@
   "name": "tslgen-edit",
   "displayName": "TSLGen-Editor",
   "description": "VSCode Editor Extension for editing TSL-Generator data files.",
-  "version": "0.0.1",
-  "publisher": "JPietrzyk",
+  "version": "0.0.2",
+  "publisher": "JPietrzykAKrause",
   "engines": {
     "vscode": "^1.77.0"
   },
@@ -13,6 +13,10 @@
   "activationEvents": [
     "onLanguage:yaml"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/db-tu-dresden/vscode-tslgenedit"
+  },
   "main": "./dist/extension.js",
   "contributes": {
     "views": {
