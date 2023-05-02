@@ -22,7 +22,8 @@ Currently, the extension supports the following features:
 
 ## Known Issues
 
-Currently, only primitive definitions can be rendered.
+- Currently, only primitive definitions can be rendered.
+- The extension expects a folder structure like [in the consolidate branch](https://github.com/db-tu-dresden/TVLGen/tree/consolidate). Since this branch will be merged very soon, this should not be a big deal.
 
 
 ### 0.0.1
