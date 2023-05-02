@@ -1,0 +1,14 @@
+
+node_modules/
+
+dist/
+
+.eslintrc.json
+
+.vscodeignore
+
+CHANGELOG.md
+
+vsc-extension-quickstart.md
+
+package-lock.json

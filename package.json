@@ -1,0 +1,97 @@
+{
+  "name": "tslgen-edit",
+  "displayName": "TSLGen-Editor",
+  "description": "VSCode Editor Extension for editing TSL-Generator data files.",
+  "version": "0.0.1",
+  "publisher": "JPietrzyk",
+  "engines": {
+    "vscode": "^1.77.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onLanguage:yaml"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "views": {
+      "explorer": [
+        {
+          "type": "webview",
+          "id": "tslgenedit.generatedCodePreview",
+          "name": "TSLGen-Editor Code Preview"
+        }
+      ]
+    },
+    "languages": [
+      {
+        "id": "yaml",
+        "extensions": [
+          ".yaml",
+          ".yml"
+        ]
+      }
+    ],
+    "commands": [
+      {
+        "command": "extension.preview",
+        "title": "Render the currently selected section.",
+        "category": "TSLGen-Editor"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "extension.preview",
+        "key": "ctrl+alt+p",
+        "mac": "cmd+alt+p",
+        "when": "editorTextFocus"
+      }
+    ]
+  },
+  "menus": {
+    "commandPalette": [
+      {
+        "command": "extension.importTVLGeneratorProject",
+        "when": "editorTextFocus"
+      }
+    ]
+  },
+  "dependencies": {
+    "copy-webpack-plugin": "^11.0.0",
+    "highlight.js": "^11.7.0",
+    "twing": "^6.0.0-alpha.1"
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "webpack",
+    "watch": "webpack --watch",
+    "package": "webpack --mode production --devtool hidden-source-map",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "pretest": "npm run compile-tests && npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/glob": "^8.1.0",
+    "@types/mocha": "^10.0.1",
+    "@types/node": "16.x",
+    "@types/vscode": "^1.77.0",
+    "@typescript-eslint/eslint-plugin": "^5.56.0",
+    "@typescript-eslint/parser": "^5.56.0",
+    "@vscode/test-electron": "^2.3.0",
+    "eslint": "^8.36.0",
+    "glob": "^8.1.0",
+    "mocha": "^10.2.0",
+    "ts-loader": "^9.4.2",
+    "typescript": "^5.0.2",
+    "vscode": "^1.1.37",
+    "webpack": "^5.76.3",
+    "webpack-cli": "^5.0.1"
+  },
+  "files": [
+    "out",
+    "node_modules"
+  ]
+}
