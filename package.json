@@ -46,12 +46,17 @@
       {
         "command": "tslgen-edit.addFile",
         "title": "Add a new Data File to your TSL project.",
-        "category": "TSLGen-Editore"
+        "category": "TSLGen-Editor"
       },
       {
         "command": "tslgen-edit.toggleFocusMode",
         "title": "Toggles the visibility of TSl-Generator related files.",
-        "category": "TSLGen-Editore"
+        "category": "TSLGen-Editor"
+      },
+      {
+        "command": "tslgen-edit.format",
+        "title": "Formats a given YAML File.",
+        "category": "TSLGen-Editor"
       }
     ],
     "keybindings": [

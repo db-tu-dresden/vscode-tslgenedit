@@ -48,6 +48,10 @@ export async function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(vscode.commands.registerCommand('tslgen-edit.toggleFocusMode', async() => {
         await tslEditorExtension.toggleFocusMode();
     }));
+
+    context.subscriptions.push(vscode.commands.registerCommand('tslgen-edit.format', async() => {
+        await tslEditorExtension.formatFile();
+    }));
     tslEditorExtension.toggleFocusMode(true);
     // vscode.commands.executeCommand('workbench.view.explorer');
 }

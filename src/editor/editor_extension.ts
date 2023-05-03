@@ -204,8 +204,8 @@ export class TSLEditorExtension {
         }
     }
 
-    public async getDocumentSymbols(): Promise<vscode.DocumentSymbol[]> {
-        const _currentTSLRoot = await TSLGeneratorModel.getTSLRootFolderForCurrentActiveFile();
+    public getDocumentSymbols(): vscode.DocumentSymbol[] {
+        const _currentTSLRoot = TSLGeneratorModel.getTSLRootFolderForCurrentActiveFile();
         if (!_currentTSLRoot) {
             return [];
         }
@@ -232,6 +232,37 @@ export class TSLEditorExtension {
         } else {
             return [];
         }
+    }
+
+    public async formatFile() {
+        const _currentTSLRoot = await TSLGeneratorModel.getTSLRootFolderForCurrentActiveFile();
+        if (!_currentTSLRoot) {
+            return ;
+        }
+        const _document = EditorUtils.getActiveDocument();
+        if (!_document) {
+            return ;
+        }
+        const _documentText = _document.getText();
+        if (_documentText.length === 0) {
+            return ;
+        }
+        const _parsedDocuments = SerializerUtils.parseYamlDocuments(_documentText);
+        if ("empty" in _parsedDocuments) {
+            return ;
+        }
+        const _formattedText = SerializerUtils.dumpYamlDocuments(_parsedDocuments);
+        // console.log(_formattedText);
+        if (! 
+            await FileSystemUtils.writeFile(
+                _document.uri, _formattedText
+            )
+         ) {
+            return;
+        }
+        // _document.
+        // const doc = await vscode.workspace.openTextDocument(_fileUri);
+        // await vscode.window.showTextDocument(doc);
     }
 
     public async renderCurrentSelection(): Promise<TSLEditorPreview.RenderedString[]> {
@@ -387,7 +418,6 @@ export class TSLEditorExtension {
         }
         _config.update("files.exclude", _filesExclude, vscode.ConfigurationTarget.Workspace);
         vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
-
     }
 }
 export const tslEditorExtension = TSLEditorExtension.getInstance();
