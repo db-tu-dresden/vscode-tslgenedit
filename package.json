@@ -65,13 +65,13 @@
         "command": "tslgen-edit.addFile",
         "key": "ctrl+alt+n",
         "mac": "cmd+alt+n",
-        "when": "editorTextFocus"
+        "when": "workspaceFolderCount > 0"
       },
       {
         "command": "tslgen-edit.toggleFocusMode",
         "key": "ctrl+alt+f",
         "mac": "cmd+alt+f",
-        "when": "editorTextFocus"
+        "when": "view.workbench.explorer.fileView.visible"
       }
     ]
   },
