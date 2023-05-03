@@ -1,5 +1,4 @@
 import * as vscode from 'vscode';
-import * as yaml from 'yaml';
 import { TSLGeneratorModel } from "../tslgen/model";
 import { EditorUtils } from "../utils/vscode_editor";
 import { FileSystemUtils } from '../utils/files';
@@ -19,13 +18,48 @@ export class TSLEditorExtension {
     private fsWatchers: vscode.FileSystemWatcher[] = [];
     private schemaLocations: { [key: string]: TSLGeneratorSchema.SchemaFileLocations } = {};
     private schemata: { [key: string]: TSLGeneratorSchema.Schemata } = {};
-    private constructor() { }
+    private constructor() { 
+        this.getCurrentTSLRoot = this.getCurrentTSLRoot.bind(this);
+    }
     public static getInstance(): TSLEditorExtension {
         if (!TSLEditorExtension.instance) {
             TSLEditorExtension.instance = new TSLEditorExtension();
         }
         return TSLEditorExtension.instance;
     }
+
+    private async getCurrentTSLRoot(silent: boolean = false): Promise<vscode.Uri | undefined> {
+        const _currentTSLRoot = await TSLGeneratorModel.getTSLRootFolderForCurrentActiveFile();
+        if (!_currentTSLRoot) {
+            return undefined;
+        }
+        if (!(_currentTSLRoot.fsPath in this.openedTSLGenerators)) {
+            if (silent) {
+                await this.update();
+                if (!(_currentTSLRoot.fsPath in this.openedTSLGenerators)) {
+                    vscode.window.showErrorMessage(`${_currentTSLRoot.fsPath} could not be parsed.`);
+                    return undefined;
+                }
+            } else {
+                const selected = await vscode.window.showErrorMessage(`${_currentTSLRoot.fsPath} was not parsed yet.`, "Initialize", "Ignore");
+                if (selected) {
+                    if (selected === 'Initialize') {
+                        await this.update();
+                        if (!(_currentTSLRoot.fsPath in this.openedTSLGenerators)) {
+                            vscode.window.showErrorMessage(`${_currentTSLRoot.fsPath} could not be parsed.`);
+                            return undefined;
+                        }
+                    } else {
+                        return undefined;
+                    }
+                } else {            
+                    return undefined;
+                }
+            }
+        }
+        return _currentTSLRoot;
+    }
+
     public getSchema(_currentFileUri: vscode.Uri): TSLGeneratorSchema.Schemata | undefined{
         const _rootFolder = TSLGeneratorModel.getTSLRootFolder(_currentFileUri);
         if (_rootFolder) {
@@ -201,25 +235,9 @@ export class TSLEditorExtension {
     }
 
     public async renderCurrentSelection(): Promise<TSLEditorPreview.RenderedString[]> {
-        const _currentTSLRoot = await TSLGeneratorModel.getTSLRootFolderForCurrentActiveFile();
+        const _currentTSLRoot = await this.getCurrentTSLRoot();
         if (!_currentTSLRoot) {
             return [TSLEditorPreview.emptyRenderedString()];
-        }
-        if (!(_currentTSLRoot.fsPath in this.openedTSLGenerators)) {
-            const selected = await vscode.window.showErrorMessage(`${_currentTSLRoot.fsPath} was not parsed yet.`, "Initialize", "Ignore");
-            if (selected) {
-                if (selected === 'Initialize') {
-                    await this.update();
-                    if (!(_currentTSLRoot.fsPath in this.openedTSLGenerators)) {
-                        vscode.window.showErrorMessage(`${_currentTSLRoot.fsPath} could not be parsed.`);
-                        return [TSLEditorPreview.emptyRenderedString()];
-                    }
-                } else {
-                    return [TSLEditorPreview.emptyRenderedString()];
-                }
-            } else {            
-                return [TSLEditorPreview.emptyRenderedString()];
-            }
         }
         const _tslGenSpecs: TSLGeneratorModel.TSLGeneratorSpecs = this.openedTSLGenerators[_currentTSLRoot.fsPath];
         const _defaults = await TSLEditorTransformation.getDefaultsFromYamlSchema(_tslGenSpecs.tslgenDataSchemaFile);
@@ -243,9 +261,133 @@ export class TSLEditorExtension {
             _currentActiveDocument, 
             _parsedDocuments, 
             _currentCursorPosition);
-        console.error(result[0].content);
-        console.log("end");
         return result;
+    }
+
+    private async getStringInput(title: string, description: string): Promise<string> {
+        const _result = await vscode.window.showInputBox(
+            {
+                title: title,
+                prompt: description
+            }
+        );
+        return _result ?? '';
+    }
+    private async getQuickPickInput(values: string[], title: string, description: string): Promise<string> {
+        const _result = await vscode.window.showQuickPick(
+            values, 
+            { 
+                title: title,
+                placeHolder: description
+            });
+        return _result ?? '';
+    }
+    public async createFile(): Promise<void> {
+        const _currentTSLRoot = await this.getCurrentTSLRoot();
+        if (!_currentTSLRoot) {
+            return;
+        }
+        const _currentSpecs = this.openedTSLGenerators[_currentTSLRoot.fsPath];
+        const _fileTypeString = await this.getQuickPickInput(["Primitive Class", "Extension"], "New File", "Choose a file type.");
+        if (_fileTypeString.trim().length === 0) {
+            return;
+        }
+        if (_fileTypeString === "Extension") {
+            const _descriptionFileName = `Insert a concise and explicit name of the new extension. 
+            The extension should only consist of alphanumeric characters and '_'. 
+            You don't need to add file extension. If a file extension is provied, it will be substituted with *.yaml.`;
+            const _desriptionFlynnName = `Choose the type of extension. 
+            Is it Single-Instruction-Multiple-Data (SIMD) or Single-Instruction-Multiple-Threads (SIMT).`;
+            const _descriptionVendorName = `Insert the vendor name, e.g., arm, intel.
+            The input must only consist of characters.`;
+            const _fileNameInput = await this.getStringInput("New Extension File (1/3): Extension Name", _descriptionFileName);
+            if (_fileNameInput.trim().length === 0) {
+                return;
+            }
+            const _fileNameNormalized = FileSystemUtils.filename(_fileNameInput, false).replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase();
+            if (_fileNameNormalized.trim().length === 0) {
+                return;
+            }
+            const _fileName = FileSystemUtils.filenameWithExtension(_fileNameNormalized, '.yaml');
+            const _flynnNameInput = await this.getQuickPickInput(["SIMD", "SIMT"], "New Extension File (2/3): Flynns Class", _desriptionFlynnName);
+            if (_flynnNameInput.trim().length === 0) {
+                return;
+            }
+            const _flynnName = _flynnNameInput.toLowerCase();
+            const _vendorNameInput = await this.getStringInput("New Extension File (3/3): Vendor Name", _descriptionVendorName);
+            if (_vendorNameInput.trim().length === 0) {
+                return;
+            }
+            const _vendorName = _vendorNameInput.replace(/[^a-zA-Z]/, '').toLowerCase();
+            if (_vendorName.trim().length === 0) {
+                return;
+            }
+            const _fileValue = `---\ndescription: "Definition of the ${_flynnNameInput} TargetExtension ${_fileNameNormalized}."\nvendor: "${_vendorName}"\nextension_name: "${_fileNameNormalized}"\n...`;
+            const _fileUri = FileSystemUtils.addPathToUri(_currentSpecs.tslgenExtensionDataFolder, _flynnName, _vendorName, _fileName);
+            if (! await FileSystemUtils.createDir(FileSystemUtils.truncateFile(_fileUri))) {
+                return;
+            }
+            if (! 
+                await FileSystemUtils.writeFile(
+                    _fileUri, 
+                    _fileValue)) {
+                return;
+            }
+            const doc = await vscode.workspace.openTextDocument(_fileUri);
+            await vscode.window.showTextDocument(doc);
+            return;            
+        } else if (_fileTypeString === "Primitive Class") {
+            const _primitiveClassName = `Insert a concise and explicit name of the new primitive class.
+            The primitive class should only consist of characters, e.g., 'ls', 'calc'.`;
+            const _fileNameInput = await this.getStringInput("New Primitive Class File (1/2): Class Name", _primitiveClassName);
+            if (_fileNameInput.trim().length === 0) {
+                return;
+            }
+            const _fileNameNormalized = FileSystemUtils.filename(_fileNameInput, false).replace(/[^a-zA-Z]/, '').toLowerCase();
+            if (_fileNameNormalized.trim().length === 0) {
+                return;
+            }
+            const _fileName = FileSystemUtils.filenameWithExtension(_fileNameNormalized, '.yaml');
+            const _description = `Insert a brief description of the class.`;
+            const _primitiveClassDescriptionInput = await this.getStringInput("New Primitive Class File (2/2): Description", _description);
+            const _primitivieClassDescription = _primitiveClassDescriptionInput.trim();
+            const _fileValue = `---\n#Preamble\nname: "${_fileNameNormalized}"\ndescription: "${_primitivieClassDescription}"\n...`;
+            const _fileUri = FileSystemUtils.addPathToUri(_currentSpecs.tslgenPrimitiveDataFolder, _fileName);
+            if (! 
+                await FileSystemUtils.writeFile(
+                    _fileUri, 
+                    _fileValue)) {
+                return;
+            }
+            const doc = await vscode.workspace.openTextDocument(_fileUri);
+            await vscode.window.showTextDocument(doc);
+            return;            
+        }
+    }
+    public async toggleFocusMode(init: boolean = false): Promise<void> {
+        const _currentTSLRoot = await this.getCurrentTSLRoot(true);
+        if (!_currentTSLRoot) {
+            return;
+        }
+        const _currentSpecs = this.openedTSLGenerators[_currentTSLRoot.fsPath];
+        const _irrelevantEntries = 
+            (await FileSystemUtils.getDirectories(_currentSpecs.tslgenRootFolder, false))
+            .filter((entry) => entry.fsPath !== _currentSpecs.tslgenDataFolder.fsPath)
+            .map((entry) => `**${FileSystemUtils.separator}${FileSystemUtils.baseName(entry)}`)
+            .concat(
+                (await FileSystemUtils.getFiles(_currentSpecs.tslgenRootFolder, false))
+                .map((fileEntry) => `**${FileSystemUtils.separator}${FileSystemUtils.baseName(fileEntry)}`)
+            );
+        const _config = vscode.workspace.getConfiguration();
+        const _filesExclude = _config.get<EditorUtils.FilesVisibility>('files.exclude') ?? {};
+        const _alreadyPresentEntry = _irrelevantEntries.find((item) => _filesExclude.hasOwnProperty(item));
+        const _visibility = (init) ? true : ((_alreadyPresentEntry)? !(_filesExclude[_alreadyPresentEntry]) : true);
+        for (const entry of _irrelevantEntries) {
+            _filesExclude[entry] = _visibility;
+        }
+        _config.update("files.exclude", _filesExclude, vscode.ConfigurationTarget.Workspace);
+        vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
+
     }
 }
 export const tslEditorExtension = TSLEditorExtension.getInstance();

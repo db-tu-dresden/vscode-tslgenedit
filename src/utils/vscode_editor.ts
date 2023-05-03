@@ -1,9 +1,10 @@
 
 import * as vscode from 'vscode';
-import { SerializerUtils } from './serialize';
-import { TSLGeneratorSchema } from '../tslgen/schema';
 
 export namespace EditorUtils {
+    export interface FilesVisibility {
+        [pattern: string]: boolean;
+    }
     export function isActiveEditor(): boolean {
         const editor = vscode.window.activeTextEditor;
         if (!editor) {

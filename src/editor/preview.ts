@@ -36,7 +36,7 @@ export namespace TSLEditorPreview {
         private environments: { [key: string]: TwingEnvironment } = {};
         private knownTemplateNames: string[] = [];
         public readonly twingDirectoryName: string = ".twing";
-        private constructor() { 
+        private constructor() {
         }
 
         public static getInstance(): TemplateManager {
@@ -71,7 +71,7 @@ export namespace TSLEditorPreview {
             );
         }
         public async render(baseFolder: vscode.Uri, templateName: string, data: any) {
-            if (baseFolder. fsPath in this.environments) {
+            if (baseFolder.fsPath in this.environments) {
                 const env = this.environments[baseFolder.fsPath];
                 try {
                     const result = await env.render(templateName, data);
@@ -86,19 +86,44 @@ export namespace TSLEditorPreview {
                 return "";
             }
         }
-        public async renderString(templateStr: string, data: any, identifier: string | number) {
+        public async renderStrings(templateStr: string, data: { [key: string]: any }) {
+            const twing = new TwingEnvironment(
+                new TwingLoaderArray({
+                    'ad_hoc.twig': templateStr
+                }),
+                {
+                    debug: false,
+                    strict_variables: false,
+                    autoescape: 'html',
+                    cache: false
+                }
+            );
+            const promises = Object.entries(data).map(async ([key, value]) => {
+                try {
+                    const resultString = await twing.render('ad_hoc.twig', value);
+                    return [key, resultString];
+                } catch (error) {
+                    vscode.window.showErrorMessage(`Could not render template for type ${key}: ${error}`);
+                    return [key, ""];
+                }
+            });
+            const results = await Promise.all(promises);
+            return Object.fromEntries(results);
+        }
+
+        public async renderString(templateStr: string, data: any) {
             // const hash = crypto.createHash('sha512');
             // hash.update(templateStr);
             // const templateName = `ad_hoc${hash.digest('hex')}_${identifier}.twig`;
             const twing = new TwingEnvironment(new TwingLoaderArray({
-                'ad_hoc.twig' : templateStr
+                'ad_hoc.twig': templateStr
             }),
-            {
-                debug: false,
-                strict_variables: false,
-                autoescape: 'html',
-                cache: false
-            });
+                {
+                    debug: false,
+                    strict_variables: false,
+                    autoescape: 'html',
+                    cache: false
+                });
             try {
                 const result = await twing.render('ad_hoc.twig', data);
                 return result;
@@ -117,7 +142,7 @@ export namespace TSLEditorPreview {
             //     vscode.window.showErrorMessage(`Error while rendering preview: ${e}`);
             //     return "";
             // }
-            
+
 
         }
 
@@ -126,7 +151,7 @@ export namespace TSLEditorPreview {
 
 
 
-    
+
 
     async function getTSLExtensionDocument(tslSpecs: TSLGeneratorModel.TSLGeneratorSpecs, extensionName: string): Promise<undefined | SerializerUtils.YamlDocument> {
         for (const _extensionFile of await FileSystemUtils.iterFiles(tslSpecs.tslgenExtensionDataFolder, TSLGeneratorModel.tslGenDataFileExtension)) {
@@ -169,8 +194,8 @@ export namespace TSLEditorPreview {
         if (_fileType === TSLGeneratorModel.TSLDataFileContentType.extension) {
             return [{
                 content: await templateManager.render(
-                    tslSpecs.tslgenTemplateRootFolder, 
-                    `@core/extension${TSLEditorTransformation.templateFileExtension}`, 
+                    tslSpecs.tslgenTemplateRootFolder,
+                    `@core/extension${TSLEditorTransformation.templateFileExtension}`,
                     TypeUtils.extendObjects(_data.toJSON(), defaults.extension)),
                 tslType: TSLDataType.extension
             }];
@@ -210,9 +235,9 @@ export namespace TSLEditorPreview {
             if (!_selectedDefinitionItem) {
                 return [{
                     content: await templateManager.render(
-                        tslSpecs.tslgenTemplateRootFolder, 
-                        `@core/primitive_declaration${TSLEditorTransformation.templateFileExtension}`, 
-                        TypeUtils.extendObjects(_declarationJson,defaults.primitiveDeclaration) 
+                        tslSpecs.tslgenTemplateRootFolder,
+                        `@core/primitive_declaration${TSLEditorTransformation.templateFileExtension}`,
+                        TypeUtils.extendObjects(_declarationJson, defaults.primitiveDeclaration)
                     ),
                     tslType: TSLDataType.primitiveDeclaration
                 }];
@@ -241,7 +266,7 @@ export namespace TSLEditorPreview {
                 const _extensionDataJson = ((_extensionData) && (yaml.isDocument(_extensionData))) ? _extensionData.toJSON() : {};
 
                 const _declarationAndExtensionDataJson = TypeUtils.extendObjects(
-                    TypeUtils.extendObjects(_extensionDataJson, defaults.extension), 
+                    TypeUtils.extendObjects(_extensionDataJson, defaults.extension),
                     TypeUtils.extendObjects(_declarationJson, defaults.primitiveDeclaration)
                 );
 
@@ -251,35 +276,34 @@ export namespace TSLEditorPreview {
                     _declarationAndExtensionDataJson
                 );
 
-                const _renderedDefinitions = await Promise.all(_ctypeArray.map(async (ctype) => {
-                    let currentDataJson = {..._mergedDataJson};
+                const ctype_map = _ctypeArray.reduce((dict: {[key:string]: any}, ctype: string) => {
+                    let currentDataJson = { ..._mergedDataJson };
                     currentDataJson["ctype"] = ctype;
-                    try {
-                        currentDataJson["implementation"] = await templateManager.renderString(currentDataJson["implementation"], currentDataJson, ctype);
-                    } catch (err) {
-                        console.error(err);
-                        return { content: "", tslType: TSLDataType.primitiveDefinition, ctype: ctype};
-                    }
-
-                    // _definition.set("ctype", ctype);
-                    // const _mergedData = TypeUtils.extendObjects(
-                        // TypeUtils.extendObjects(_definition.toJSON(), defaults.primitiveDefinition),
-                        // _declarationAndExtensionDataJson
-                    // );
-
+                    dict[ctype] = currentDataJson;
+                    return dict;
+                }, {});
+                const _renderedImplementations =
+                    await templateManager.renderStrings(
+                        _mergedDataJson["implementation"],
+                        ctype_map
+                    );
+                
+                const _renderedDefinitions = await Promise.all(_ctypeArray.map(async (ctype) => {
+                    const data = {...ctype_map[ctype]};
+                    data["implementation"] = _renderedImplementations[ctype];
                     try {
                         return {
                             content: await templateManager.render(
                                 tslSpecs.tslgenTemplateRootFolder,
                                 `@core/primitive_definition${TSLEditorTransformation.templateFileExtension}`,
-                                currentDataJson
+                                data
                             ),
                             tslType: TSLDataType.primitiveDefinition,
                             ctype: ctype
                         };
                     } catch (err) {
                         console.error(err);
-                        return { content: "", tslType: TSLDataType.primitiveDefinition, ctype: ctype};
+                        return { content: "", tslType: TSLDataType.primitiveDefinition, ctype: ctype };
                     }
                 }));
                 return _renderedDefinitions;
@@ -321,7 +345,7 @@ export namespace TSLEditorPreview {
                     this._view.webview.html = "No Primitive selected.";
                     this._view.show?.(true);
                 }
-                this.latestContent = data;                
+                this.latestContent = data;
                 this._view.webview.html = this._getHtmlForWebview(this._view?.webview, this.latestContent);
                 this._view.show?.(true);
             }
@@ -332,18 +356,18 @@ export namespace TSLEditorPreview {
             let buttons: string[];
             let pres: string[];
 
-            
+
 
             buttons = [];
             pres = [];
-            for ( let idx = 0; idx < cppCodes.length; ++idx ) {
+            for (let idx = 0; idx < cppCodes.length; ++idx) {
                 const rendered = cppCodes[idx];
-                if ( rendered.ctype != undefined ) {
+                if (rendered.ctype != undefined) {
                     buttons.push(
-                        `<button class="tablinks${(idx == 0 ? " active":"")}" onclick="displayPrimitive(event, '${rendered.ctype}')">${rendered.ctype}</button>`
+                        `<button class="tablinks${(idx == 0 ? " active" : "")}" onclick="displayPrimitive(event, '${rendered.ctype}')">${rendered.ctype}</button>`
                     );
                     pres.push(
-                        `<div id="${rendered.ctype}" class="primitive" ${(idx == 0 ? "style=\"display:block;\"":"style=\"display:none;\"")}>
+                        `<div id="${rendered.ctype}" class="primitive" ${(idx == 0 ? "style=\"display:block;\"" : "style=\"display:none;\"")}>
                             <pre class="sh_cpp">
                                 ${this.indentCPP(rendered.content)}
                             </pre>
@@ -352,7 +376,7 @@ export namespace TSLEditorPreview {
                 }
                 // ${this.indentCPP(rendered.content.replaceAll("<", "&lt;").replaceAll(">", "&gt;"))}
             }
-            
+
             return `<html>
                         <head>
                             <script type="text/javascript" src="${jsFile}"></script>
@@ -435,7 +459,7 @@ export namespace TSLEditorPreview {
             for (const line of lines) {
                 let trimmed = line.trim();
                 const inline_brace_pair: Boolean = trimmed.includes("{") && trimmed.includes("}");
-                if ( !inline_brace_pair && (trimmed.startsWith("}") || trimmed.endsWith("}") || trimmed.endsWith("};"))) {
+                if (!inline_brace_pair && (trimmed.startsWith("}") || trimmed.endsWith("}") || trimmed.endsWith("};"))) {
                     level--;
                 }
                 formatted += minIndent + indentChar.repeat(level) + trimmed + "\n";

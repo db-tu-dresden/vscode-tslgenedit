@@ -42,6 +42,16 @@
         "command": "tslgen-edit.preview",
         "title": "Render the currently selected section.",
         "category": "TSLGen-Editor"
+      },
+      {
+        "command": "tslgen-edit.addFile",
+        "title": "Add a new Data File to your TSL project.",
+        "category": "TSLGen-Editore"
+      },
+      {
+        "command": "tslgen-edit.toggleFocusMode",
+        "title": "Toggles the visibility of TSl-Generator related files.",
+        "category": "TSLGen-Editore"
       }
     ],
     "keybindings": [
@@ -49,6 +59,18 @@
         "command": "tslgen-edit.preview",
         "key": "ctrl+alt+p",
         "mac": "cmd+alt+p",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "tslgen-edit.addFile",
+        "key": "ctrl+alt+n",
+        "mac": "cmd+alt+n",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "tslgen-edit.toggleFocusMode",
+        "key": "ctrl+alt+f",
+        "mac": "cmd+alt+f",
         "when": "editorTextFocus"
       }
     ]

@@ -38,6 +38,12 @@ Improved Preview.
 
 Refactored Library name from TVL to TSL.
 
+### 0.0.4
+
+- Added Focus-Mode.
+- Added command to create new data files.
+- Optimized Preview rendering.
+
 ### Acknowledgments
 
 Thanks to Alexander Krause for getting the web view and rendering up and running. 

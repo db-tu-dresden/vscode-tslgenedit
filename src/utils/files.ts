@@ -21,8 +21,10 @@ export namespace FileSystemUtils {
         return _basePath.with({ path: _basePath.fsPath + separator + [...toAddPath].filter(str => str !?? '').join(separator) });
     }
     export function baseNameEqual(uri: vscode.Uri | string, folderName: string): boolean {
-        const xxx = path.basename(toUri(uri).fsPath);
         return (folderName === path.basename(toUri(uri).fsPath));
+    }
+    export function baseName(uri: vscode.Uri | string): string {
+        return path.basename(toUri(uri).fsPath);
     }
     export function containsAny(uri: vscode.Uri | string, ...folderNames: string[]): boolean {
         const _parts = split(uri);
@@ -122,6 +124,33 @@ export namespace FileSystemUtils {
             } catch (err) {
                 return false;
             }
+        }
+    }
+    export async function getDirectories(startUri: vscode.Uri | string, recursive: boolean = false): Promise<vscode.Uri[]> {
+        const _uri = toUri(startUri);
+        const _directoryPath: string = _uri.fsPath;
+        const _entries = await fs.promises.readdir(_directoryPath, { withFileTypes: true });
+        const _dirs = _entries.filter(entry => entry.isDirectory()).map(entry => _uri.with({ path: path.join(_uri.fsPath, entry.name) }));
+        if (recursive) {
+            const subDirPromises = _dirs.map(dir => getDirectories(dir, true));
+            const subDirs = await Promise.all(subDirPromises);
+            return _dirs.concat(...subDirs);
+        } else {
+            return _dirs;
+        }
+    }
+    export async function getFiles(startUri: vscode.Uri | string, recursive: boolean = false): Promise<vscode.Uri[]> {
+        const _uri = toUri(startUri);
+        const _directoryPath: string = _uri.fsPath;
+        const _entries = await fs.promises.readdir(_directoryPath, { withFileTypes: true });
+        const _dirs = _entries.filter(entry => entry.isDirectory()).map(entry => _uri.with({ path: path.join(_uri.fsPath, entry.name) }));
+        const _files = _entries.filter(entry => entry.isFile()).map(entry => _uri.with({ path: path.join(_uri.fsPath, entry.name) }));
+        if (recursive) {
+            const _subFilesPromises = _dirs.map(dir => getFiles(dir, true));
+            const _subDirsFiles = await Promise.all(_subFilesPromises);
+            return _files.concat(..._subDirsFiles);
+        } else {
+            return _files;
         }
     }
     export async function iterFiles(startUri: vscode.Uri | string, fileExtension: string | undefined = undefined): Promise<MutableFile[]> {
