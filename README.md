@@ -6,18 +6,35 @@ As YAML sometimes is hard to debug and maintain, the Editor Extension is meant t
 ## Features
 
 Currently, the extension supports the following features:
-- Outlining (Adding relevant links of a document to the outline)
-- Auto-Completion (providing suggestions of possible keys)
-- skeleton-creation (creating object sceletons for complex objects)
-- Preview (rendering the currently selected primitive using [ctrl]+[alt]+[p])
 
-### Outlining
+### __New File Creation Wizard__
+
+Adding new data files to the TSL Generator folder.
+
+![](docu/new_file.gif)
+
+### __Focus-Mode__
+
+Hide all TSL Generator directories and files which are not relevant for you.
+
+![](docu/focus.gif)
+
+### __Outlining__
+
+Add relevant links of a document to the outline
+
 ![](docu/outline.gif)
 
-### Auto-Completion
+### __Auto-Completion__
+
+Get suggestions for possible keys. Create object sceletons for complex objects
+
 ![](docu/auto_complete.gif)
 
-### Preview
+### __Ad-Hoc Preview__
+
+Render the currently selected primitive.
+
 ![](docu/preview.gif)
 
 ## Known Issues
