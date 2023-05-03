@@ -297,9 +297,7 @@ export class TSLEditorExtension {
             editBuilder.replace(range, _sortedText);
         });
         await vscode.commands.executeCommand('vscode.executeDocumentSymbolProvider', _document.uri);
-
     }
-
     public async renderCurrentSelection(): Promise<TSLEditorPreview.RenderedString[]> {
         const _currentTSLRoot = await this.getCurrentTSLRoot();
         if (!_currentTSLRoot) {

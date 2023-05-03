@@ -24,7 +24,7 @@
         {
           "type": "webview",
           "id": "tslgen-edit.generatedCodePreview",
-          "name": "TSLGen-Editor Code Preview"
+          "name": "TSL-Generator Code Preview"
         }
       ]
     },
@@ -41,27 +41,27 @@
       {
         "command": "tslgen-edit.preview",
         "title": "Render the currently selected section.",
-        "category": "TSLGen-Editor"
+        "category": "TSL-Generator"
       },
       {
         "command": "tslgen-edit.addFile",
         "title": "Add a new Data File to your TSL project.",
-        "category": "TSLGen-Editor"
+        "category": "TSL-Generator"
       },
       {
         "command": "tslgen-edit.toggleFocusMode",
         "title": "Toggles the visibility of TSl-Generator related files.",
-        "category": "TSLGen-Editor"
+        "category": "TSL-Generator"
       },
       {
         "command": "tslgen-edit.format",
-        "title": "Formats a active YAML File.",
-        "category": "TSLGen-Editor"
+        "title": "Format File.",
+        "category": "TSL-Generator"
       },
       {
         "command": "tslgen-edit.sort",
-        "title": "Sort the active YAML File.",
-        "category": "TSLGen-Editor"
+        "title": "Sort Yaml Documents.",
+        "category": "TSL-Generator"
       }
     ],
     "keybindings": [
@@ -83,13 +83,44 @@
         "mac": "cmd+alt+f",
         "when": "view.workbench.explorer.fileView.visible"
       }
-    ]
-  },
-  "menus": {
-    "commandPalette": [
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "tslgen-edit.format",
+          "when": "(resourceLangId == yaml) && editorTextFocus",
+          "group": "tslFormat"
+        },
+        {
+          "command": "tslgen-edit.sort",
+          "when": "(resourceLangId == yaml) && editorTextFocus",
+          "group": "tslFormat"
+        }
+      ],
+      "editor/context": [
+        {
+          "submenu": "tslgen.Format",
+          "group": "1_modification",
+          "when": "(resourceLangId == yaml) && editorTextFocus"
+        }
+      ],
+      "tslgen.Format": [
+        {
+          "command": "tslgen-edit.format",
+          "group": "1_modification",
+          "when": "(resourceLangId == yaml) && editorTextFocus"
+        },
+        {
+          "command": "tslgen-edit.sort",
+          "group": "1_modification",
+          "when": "(resourceLangId == yaml) && editorTextFocus"
+        }
+      ]      
+    },
+    "submenus": [
       {
-        "command": "tslgen-edit.importTVLGeneratorProject",
-        "when": "editorTextFocus"
+        "label": "Change TVL-Generator File",
+        "id": "tslgen.Format"
       }
     ]
   },
