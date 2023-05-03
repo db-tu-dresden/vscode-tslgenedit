@@ -40,27 +40,27 @@
     "commands": [
       {
         "command": "tslgen-edit.preview",
-        "title": "Render the currently selected section.",
+        "title": "Render the currently selected section",
         "category": "TSL-Generator"
       },
       {
         "command": "tslgen-edit.addFile",
-        "title": "Add a new Data File to your TSL project.",
+        "title": "Add a new Data File to your TSL project",
         "category": "TSL-Generator"
       },
       {
         "command": "tslgen-edit.toggleFocusMode",
-        "title": "Toggles the visibility of TSl-Generator related files.",
+        "title": "Toggles the visibility of TSl-Generator related files",
         "category": "TSL-Generator"
       },
       {
         "command": "tslgen-edit.format",
-        "title": "Format File.",
+        "title": "Format File",
         "category": "TSL-Generator"
       },
       {
         "command": "tslgen-edit.sort",
-        "title": "Sort Yaml Documents.",
+        "title": "Sort Yaml Documents",
         "category": "TSL-Generator"
       }
     ],
@@ -119,7 +119,7 @@
     },
     "submenus": [
       {
-        "label": "Change TVL-Generator File",
+        "label": "Change TSL-Generator Data File",
         "id": "tslgen.Format"
       }
     ]

@@ -61,6 +61,11 @@ Refactored Library name from TVL to TSL.
 - Added command to create new data files.
 - Optimized Preview rendering.
 
+### 0.0.5
+
+- Added Sorting of Primitives in a TSL Primitive Data File.
+- Added Formating a TSL Data File.
+
 ### Acknowledgments
 
 Thanks to Alexander Krause for getting the web view and rendering up and running. 
