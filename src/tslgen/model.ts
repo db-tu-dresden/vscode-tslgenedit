@@ -3,6 +3,7 @@ import * as yaml from 'yaml';
 
 import { FileSystemUtils } from '../utils/files';
 import { EditorUtils } from '../utils/vscode_editor';
+import { SerializerUtils } from '../utils/serialize';
 
 export namespace TSLGeneratorModel {
     const primitiveDataFolderName: string = "primitives";
@@ -139,6 +140,72 @@ export namespace TSLGeneratorModel {
             }
         }
         return undefined;
+    }
+
+    export async function sortPrimitives(docs: SerializerUtils.YamlDocument[]): Promise<SerializerUtils.YamlDocument[]> {
+        // 
+        // const _sortedDocs = 
+        //     docs.slice(1).sort((left,right) => {
+        //         const _leftFunctorName = left.get("functor_name") ?? left.get("primitive_name") ?? '';
+        //         const _rightFunctorName = right.get("functor_name") ?? right.get("primitive_name") ?? '';
+        //         if (_leftFunctorName > _rightFunctorName) {
+        //             return -1;
+        //         } else if (_leftFunctorName < _rightFunctorName) {
+        //             return 1;
+        //         }
+        //         return 0;
+        //     });
+        const _promises = docs.slice(1).map(async (doc) => {
+            const combinedName = `${doc.get("primitive_name") ?? ''}::${doc.get("functor_name") ?? ''}`;
+            // const functorName = doc.get("functor_name") ?? doc.get("primitive_name") ?? '';
+            return { doc, combinedName };
+        });
+        
+        const _sortedDocs = await Promise.all(_promises)
+            .then((values) => {
+                return values.sort((left, right) => {
+                    if (left.combinedName > right.combinedName) {
+                        return 1;
+                    } else if (left.combinedName < right.combinedName) {
+                        return -1;
+                    }
+                    return 0;
+                }).map((value) => {
+                    return value.doc;
+                });
+            });
+        const _allSortedPromises = 
+            _sortedDocs.map(async (entry) => {
+                const _definitionsItem = entry.get("definitions");
+                if (_definitionsItem && yaml.isCollection(_definitionsItem)) {
+                    const _sortedDefinitions = _definitionsItem.items.sort((left, right) => {
+                        const _leftDefinition = left as yaml.YAMLMap<unknown, unknown>;
+                        const _rightDefinition = right as yaml.YAMLMap<unknown, unknown>;
+                        const _leftExtensionName = _leftDefinition.get("target_extension") ?? '';
+                        const _rightExtensionName = _rightDefinition.get("target_extension") ?? '';
+                        if (_leftExtensionName > _rightExtensionName) {
+                            return 1;
+                        } else if (_leftExtensionName < _rightExtensionName) {
+                            return -1;
+                        } else {
+                            const _leftFlagsItem = _leftDefinition.get("lscpu_flags");
+                            const _leftFlags: string = (_leftFlagsItem) ? ((yaml.isCollection(_leftFlagsItem)) ? _leftFlagsItem.items.join(", ") : `${_leftFlagsItem}`) : "";
+                            const _rightFlagsItem = _rightDefinition.get("lscpu_flags");
+                            const _rightFlags: string = (_rightFlagsItem) ? ((yaml.isCollection(_rightFlagsItem)) ? _rightFlagsItem.items.join(", ") : `${_rightFlagsItem}`) : "";
+                            if (_leftFlags > _rightFlags) {
+                                return 1;
+                            } else if (_leftFlags < _rightFlags) {
+                                return -1;
+                            }
+                            return 0;
+                        }
+                    });
+                    entry.set("definitions", _sortedDefinitions);
+                }
+                return entry;
+            });
+        const _allSorted = await Promise.all(_allSortedPromises);
+        return [docs[0]].concat(_allSorted);
     }
 
 }

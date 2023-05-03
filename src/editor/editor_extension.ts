@@ -235,9 +235,13 @@ export class TSLEditorExtension {
     }
 
     public async formatFile() {
-        const _currentTSLRoot = await TSLGeneratorModel.getTSLRootFolderForCurrentActiveFile();
+        const _currentTSLRoot = TSLGeneratorModel.getTSLRootFolderForCurrentActiveFile();
         if (!_currentTSLRoot) {
             return ;
+        }
+        const _editor = EditorUtils.getActiveEditor();
+        if (!_editor) {
+            return;
         }
         const _document = EditorUtils.getActiveDocument();
         if (!_document) {
@@ -251,18 +255,49 @@ export class TSLEditorExtension {
         if ("empty" in _parsedDocuments) {
             return ;
         }
-        const _formattedText = SerializerUtils.dumpYamlDocuments(_parsedDocuments);
-        // console.log(_formattedText);
-        if (! 
-            await FileSystemUtils.writeFile(
-                _document.uri, _formattedText
-            )
-         ) {
+        const _formattedText = await SerializerUtils.dumpYamlDocuments(_parsedDocuments);
+        await _editor.edit((editBuilder) => {
+            // Replace the entire text of the document with the new content
+            const document = _editor.document;
+            const lastLine = document.lineAt(document.lineCount - 1);
+            const range = new vscode.Range(0, 0, lastLine.range.end.line, lastLine.range.end.character);
+            editBuilder.replace(range, _formattedText);
+        });
+        await vscode.commands.executeCommand('vscode.executeDocumentSymbolProvider', _document.uri);
+    }
+
+    public async sortFile() {
+        const _currentTSLRoot = TSLGeneratorModel.getTSLRootFolderForCurrentActiveFile();
+        if (!_currentTSLRoot) {
+            return ;
+        }
+        const _editor = EditorUtils.getActiveEditor();
+        if (!_editor) {
             return;
         }
-        // _document.
-        // const doc = await vscode.workspace.openTextDocument(_fileUri);
-        // await vscode.window.showTextDocument(doc);
+        const _document = EditorUtils.getActiveDocument();
+        if (!_document) {
+            return ;
+        }
+        const _documentText = _document.getText();
+        if (_documentText.length === 0) {
+            return ;
+        }
+        const _parsedDocuments = SerializerUtils.parseYamlDocuments(_documentText);
+        if ("empty" in _parsedDocuments) {
+            return ;
+        }
+        const _sortedDocuments = await TSLGeneratorModel.sortPrimitives(_parsedDocuments);
+        const _sortedText = await SerializerUtils.dumpYamlDocuments(_sortedDocuments);
+        await _editor.edit((editBuilder) => {
+            // Replace the entire text of the document with the new content
+            const document = _editor.document;
+            const lastLine = document.lineAt(document.lineCount - 1);
+            const range = new vscode.Range(0, 0, lastLine.range.end.line, lastLine.range.end.character);
+            editBuilder.replace(range, _sortedText);
+        });
+        await vscode.commands.executeCommand('vscode.executeDocumentSymbolProvider', _document.uri);
+
     }
 
     public async renderCurrentSelection(): Promise<TSLEditorPreview.RenderedString[]> {

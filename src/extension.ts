@@ -52,6 +52,10 @@ export async function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(vscode.commands.registerCommand('tslgen-edit.format', async() => {
         await tslEditorExtension.formatFile();
     }));
+
+    context.subscriptions.push(vscode.commands.registerCommand('tslgen-edit.sort', async() => {
+        await tslEditorExtension.sortFile();
+    }));
     tslEditorExtension.toggleFocusMode(true);
     // vscode.commands.executeCommand('workbench.view.explorer');
 }

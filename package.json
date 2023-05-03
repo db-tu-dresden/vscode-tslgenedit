@@ -55,7 +55,12 @@
       },
       {
         "command": "tslgen-edit.format",
-        "title": "Formats a given YAML File.",
+        "title": "Formats a active YAML File.",
+        "category": "TSLGen-Editor"
+      },
+      {
+        "command": "tslgen-edit.sort",
+        "title": "Sort the active YAML File.",
         "category": "TSLGen-Editor"
       }
     ],

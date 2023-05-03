@@ -13,14 +13,15 @@ export namespace SerializerUtils {
             lineCounter: new yaml.LineCounter()
         });
     }
-    export function dumpYamlDocuments(docs: yaml.Document.Parsed<yaml.ParsedNode>[]): string {
-        let result = docs.map((doc) => {
+    export async function dumpYamlDocuments(docs: yaml.Document.Parsed<yaml.ParsedNode>[]): Promise<string> {
+        const resultPromises = docs.map(async (doc) => {
             const result = doc.toString({directives: true}).trim();
             if (result.endsWith('...')) {
                 return result.slice(0, -3).trim();
             }
             return result;
         });
+        const result = await Promise.all(resultPromises);
         return result.join('\n...\n') + "\n...\n";
     }
     export function parseYamlDocumentsAsJson(yamlString: string): any[] {
