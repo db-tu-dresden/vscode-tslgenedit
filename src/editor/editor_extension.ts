@@ -204,7 +204,7 @@ export class TSLEditorExtension {
         }
     }
 
-    public getDocumentSymbols(): vscode.DocumentSymbol[] {
+    public async getDocumentSymbols(): Promise<vscode.DocumentSymbol[]> {
         const _currentTSLRoot = TSLGeneratorModel.getTSLRootFolderForCurrentActiveFile();
         if (!_currentTSLRoot) {
             return [];
@@ -255,7 +255,9 @@ export class TSLEditorExtension {
         if ("empty" in _parsedDocuments) {
             return ;
         }
-        const _formattedText = await SerializerUtils.dumpYamlDocuments(_parsedDocuments);
+        const _preFormattedText = await SerializerUtils.dumpYamlDocuments(_parsedDocuments);
+        const regex = new RegExp('^(?<indent>\\s*)-[^-]\\s*(?<value>.+)$', 'gm');
+        const _formattedText = _preFormattedText.replaceAll(regex, `$<indent>- \n$<indent>  $<value>`);
         await _editor.edit((editBuilder) => {
             // Replace the entire text of the document with the new content
             const document = _editor.document;
