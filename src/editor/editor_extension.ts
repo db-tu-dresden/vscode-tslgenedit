@@ -430,19 +430,31 @@ export class TSLEditorExtension {
             return;            
         }
     }
+    /**
+     * This function toggles the focus mode in VS Code by hiding or showing irrelevant files and
+     * directories in the workspace.
+     * 
+     * @param init The `init` parameter is a boolean value that defaults to `false`. It is used to
+     * determine whether the function is being called for the first time or not. If `init` is `true`,
+     * the function will set the visibility of all irrelevant entries to `true`. Otherwise, it will
+     * toggle
+     */
     public async toggleFocusMode(init: boolean = false): Promise<void> {
         const _currentTSLRoot = await this.getCurrentTSLRoot(true);
         if (!_currentTSLRoot) {
             return;
         }
+        const _tslToRoot = vscode.workspace.asRelativePath(_currentTSLRoot, false);
+        const _pattern = (_tslToRoot === _currentTSLRoot.fsPath) ? "**" : `**${FileSystemUtils.separator}${_tslToRoot}`;
+        
         const _currentSpecs = this.openedTSLGenerators[_currentTSLRoot.fsPath];
         const _irrelevantEntries = 
             (await FileSystemUtils.getDirectories(_currentSpecs.tslgenRootFolder, false))
             .filter((entry) => entry.fsPath !== _currentSpecs.tslgenDataFolder.fsPath)
-            .map((entry) => `**${FileSystemUtils.separator}${FileSystemUtils.baseName(entry)}`)
+            .map((entry) => `${_pattern}${FileSystemUtils.separator}${FileSystemUtils.baseName(entry)}`)
             .concat(
                 (await FileSystemUtils.getFiles(_currentSpecs.tslgenRootFolder, false))
-                .map((fileEntry) => `**${FileSystemUtils.separator}${FileSystemUtils.baseName(fileEntry)}`)
+                .map((fileEntry) => `${_pattern}${FileSystemUtils.separator}${FileSystemUtils.baseName(fileEntry)}`)
             );
         const _config = vscode.workspace.getConfiguration();
         const _filesExclude = _config.get<EditorUtils.FilesVisibility>('files.exclude') ?? {};
