@@ -46,7 +46,7 @@ export namespace TSLEditorPreview {
             content: ""
         };
     }
-    function emptyPreview(): PreviewData {
+    export function emptyPreview(): PreviewData {
         return {
             staticContent: "",
             tslType: TSLDataType.unknown
