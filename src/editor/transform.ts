@@ -4,6 +4,7 @@ import { TSLGeneratorTemplate } from '../tslgen/template_transform';
 import { TSLGeneratorSchema } from '../tslgen/schema';
 import { SerializerUtils } from '../utils/serialize';
 import { TypeUtils } from '../utils/types';
+import { TSLGeneratorModel } from '../tslgen/model';
 
 export namespace TSLEditorTransformation {
     export interface TransformationTarget {
@@ -29,9 +30,9 @@ export namespace TSLEditorTransformation {
                     return true;
                 }
                 progress.report({ message: `Transforming ${entry.sourceFile.fsPath}...` });
-                if (FileSystemUtils.filename(entry.sourceFile).startsWith("primitive_declaration")) {
-                    // console.log("NOW");
-                }
+                // if (FileSystemUtils.filename(entry.sourceFile).startsWith("primitive_declaration")) {
+                //     console.log("NOW");
+                // }
                 const _updatedTemplateStr: string = TSLGeneratorTemplate.Jinja2ToTwing.transform(_origTemplateStr);
                 if (_updatedTemplateStr.length === 0) {
                     return false;
@@ -128,6 +129,7 @@ export namespace TSLEditorTransformation {
         }
         const _extensionSchema = TSLGeneratorSchema.SchemaTransform.filterDefaults(_jsonDocument[TSLGeneratorSchema.tslGeneratorTopLevelEntryNames["extension"]]);
         const _extensionDefaults = TSLGeneratorSchema.SchemaTransform.createDefaultEntryFromSchema(_extensionSchema);
+        _extensionDefaults['tsl_namespace'] = TSLGeneratorModel.tslNamespace;
         const _primitiveSchema = _jsonDocument[TSLGeneratorSchema.tslGeneratorTopLevelEntryNames["primitive"]];
         const _primitiveDefinition = {..._primitiveSchema['optional']['definitions']['entry_type']};
         delete _primitiveSchema['definitions'];

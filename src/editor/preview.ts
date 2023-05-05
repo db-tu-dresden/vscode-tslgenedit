@@ -391,6 +391,8 @@ export namespace TSLEditorPreview {
                 </pre>
             </div>`;
 
+            buttons = [];
+            pres = [];
             if ((previewData.variableContent) && (previewData.variableContent.length > 0)) {
                 buttons = [];
                 pres = [];

@@ -6,6 +6,7 @@ import { EditorUtils } from '../utils/vscode_editor';
 import { SerializerUtils } from '../utils/serialize';
 
 export namespace TSLGeneratorModel {
+    export const tslNamespace: string = "tsl";
     const primitiveDataFolderName: string = "primitives";
     const extensionDataFolderName: string = "extensions";
     const tslGenDataFolderName: string = "primitive_data";
