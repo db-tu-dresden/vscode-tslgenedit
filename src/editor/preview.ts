@@ -12,22 +12,48 @@ import { EditorUtils } from '../utils/vscode_editor';
 
 export namespace TSLEditorPreview {
     export enum TSLDataType {
-        primitiveDefinition = 0,
-        primitiveDeclaration = 1,
-        primitiveClass = 2,
-        extension = 3,
-        unknown = 4
+        primitiveDefinition = "Definition(s)",
+        primitiveDeclaration = "Declaration",
+        primitiveClass = "Primitive Class",
+        extension = "Extension",
+        unknown = ""
     };
+    function getKey(dataType: TSLDataType): string {
+        switch(dataType) {
+            case TSLDataType.primitiveDefinition:
+                return "primitiveDefinition";
+            case TSLDataType.primitiveDeclaration:
+                return "primitiveDeclaration";
+            case TSLDataType.primitiveClass:
+                return "primitiveClass";
+            case TSLDataType.extension:
+                return "extension";
+            default:
+                return "unknown";
+        }
+    }
     export interface RenderedString {
         content: string;
-        tslType: TSLDataType;
         ctype?: string;
     }
-    export function emptyRenderedString(): RenderedString {
+    export interface PreviewData {
+        staticContent: string;
+        tslType: TSLDataType;
+        variableContent?: RenderedString[];
+    }
+    function emptyRenderedString(): RenderedString {
         return {
-            content: "",
+            content: ""
+        };
+    }
+    function emptyPreview(): PreviewData {
+        return {
+            staticContent: "",
             tslType: TSLDataType.unknown
         };
+    }
+    function isPreviewEmpty(data: PreviewData): boolean {
+        return (data.staticContent === "");
     }
 
     export class TemplateManager {
@@ -182,23 +208,23 @@ export namespace TSLEditorPreview {
         currentDocument: vscode.TextDocument,
         documents: SerializerUtils.YamlDocument[],
         cursorPosition: vscode.Position
-    ): Promise<RenderedString[]> {
+    ): Promise<PreviewData> {
         const _fileType = TSLGeneratorModel.determineDataFileType(documents);
         if (_fileType === TSLGeneratorModel.TSLDataFileContentType.unknown) {
-            return [{ content: "", tslType: TSLDataType.unknown }];
+            return emptyPreview();
         }
         const _data = SerializerUtils.Search.getCurrentFocusedYamlDocument(documents, currentDocument, cursorPosition);
         if (!_data) {
-            return [{ content: "", tslType: TSLDataType.unknown }];
+            return emptyPreview();
         }
         if (_fileType === TSLGeneratorModel.TSLDataFileContentType.extension) {
-            return [{
-                content: await templateManager.render(
+            return {
+                staticContent: await templateManager.render(
                     tslSpecs.tslgenTemplateRootFolder,
                     `@core/extension${TSLEditorTransformation.templateFileExtension}`,
                     TypeUtils.extendObjects(_data.toJSON(), defaults.extension)),
                 tslType: TSLDataType.extension
-            }];
+            };   
         }
 
         if (_fileType === TSLGeneratorModel.TSLDataFileContentType.primitive) {
@@ -209,7 +235,6 @@ export namespace TSLEditorPreview {
             const _declarationDoc = _data.clone();
             _declarationDoc.delete("definitions");
             const _declarationJson = _declarationDoc.toJSON();
-
 
             const _definitionsItem = _data.get("definitions");
 
@@ -233,29 +258,25 @@ export namespace TSLEditorPreview {
                 }
             }
             if (!_selectedDefinitionItem) {
-                return [{
-                    content: await templateManager.render(
+                return {
+                    staticContent: await templateManager.render(
                         tslSpecs.tslgenTemplateRootFolder,
                         `@core/primitive_declaration${TSLEditorTransformation.templateFileExtension}`,
                         TypeUtils.extendObjects(_declarationJson, defaults.primitiveDeclaration)
                     ),
                     tslType: TSLDataType.primitiveDeclaration
-                }];
+                };
             } else {
                 const _definition = _selectedDefinitionItem as yaml.YAMLMap<unknown, unknown>;
                 const _ctypes = _definition.get("ctype");
                 if (!_ctypes) {
-                    return [{
-                        content: "Please specify a ctype.",
-                        tslType: TSLDataType.unknown
-                    }];
+                    vscode.window.showErrorMessage(`Please specify a ctype.`);
+                    return emptyPreview();
                 }
                 const _extensionNameItem = _definition.get("target_extension");
                 if (!_extensionNameItem) {
-                    return [{
-                        content: "Please specify an extension.",
-                        tslType: TSLDataType.unknown
-                    }];
+                    vscode.window.showErrorMessage(`Please specify an extension.`);
+                    return emptyPreview();
                 }
                 const _flags = _definition.get("lscpu_flags");
                 const _flagsStr: string = (_flags) ? ((yaml.isCollection(_flags)) ? _flags.items.join(", ") : `${_flags}`) : "";
@@ -298,28 +319,32 @@ export namespace TSLEditorPreview {
                                 `@core/primitive_definition${TSLEditorTransformation.templateFileExtension}`,
                                 data
                             ),
-                            tslType: TSLDataType.primitiveDefinition,
                             ctype: ctype
                         };
                     } catch (err) {
                         console.error(err);
-                        return { content: "", tslType: TSLDataType.primitiveDefinition, ctype: ctype };
+                        return { content: "Could not render definition", ctype: ctype };
                     }
                 }));
-                return _renderedDefinitions;
+                return {
+                    staticContent: await templateManager.render(
+                        tslSpecs.tslgenTemplateRootFolder,
+                        `@core/primitive_declaration${TSLEditorTransformation.templateFileExtension}`,
+                        _declarationAndExtensionDataJson
+                    ),
+                    tslType: TSLDataType.primitiveDeclaration,
+                    variableContent: _renderedDefinitions
+                }
             }
         }
-        return [{
-            content: "",
-            tslType: TSLDataType.extension
-        }];
+        return emptyPreview();
     }
 
 
     export class TSLGenViewProvider implements vscode.WebviewViewProvider {
         public static readonly viewType = 'tslgen-edit.generatedCodePreview';
         private _view?: vscode.WebviewView;
-        private latestContent: RenderedString[] = [emptyRenderedString()];
+        private latestContent: PreviewData = emptyPreview();
         constructor(
             private readonly _extensionUri: vscode.Uri,
             private readonly _extContext: vscode.ExtensionContext
@@ -339,10 +364,10 @@ export namespace TSLEditorPreview {
             this.setContent(this.latestContent);
         }
 
-        public setContent(data: RenderedString[]) {
+        public setContent(data: PreviewData) {
             if (this._view !== undefined) {
-                if (data.length === 0) {
-                    this._view.webview.html = "No Primitive selected.";
+                if (isPreviewEmpty(data)) {
+                    this._view.webview.html = "Nothing to show (yet).";
                     this._view.show?.(true);
                 }
                 this.latestContent = data;
@@ -351,32 +376,41 @@ export namespace TSLEditorPreview {
             }
         }
 
-        private formatCPP(webview: vscode.Webview, jsFile: string, cppFile: string, cssFile: string, cppCodes: RenderedString[]) {
+        private formatCPP(webview: vscode.Webview, jsFile: string, cppFile: string, cssFile: string, previewData: PreviewData) {
             // Powered by https://www.w3schools.com/howto/tryit.asp?filename=tryhow_js_tabs
             let buttons: string[];
             let pres: string[];
 
+            /**
+             * static content prepared here, can we add a title with cppCodes.tslType.valueOf()?
+             */
+            const staticHtml: string = 
+            `<div id="${getKey(previewData.tslType)}" class="staticContent")}>
+                <pre class="sh_cpp">
+                    ${this.indentCPP(previewData.staticContent)}
+                </pre>
+            </div>`;
 
-
-            buttons = [];
-            pres = [];
-            for (let idx = 0; idx < cppCodes.length; ++idx) {
-                const rendered = cppCodes[idx];
-                if (rendered.ctype != undefined) {
-                    buttons.push(
-                        `<button class="tablinks${(idx == 0 ? " active" : "")}" onclick="displayPrimitive(event, '${rendered.ctype}')">${rendered.ctype}</button>`
-                    );
-                    pres.push(
-                        `<div id="${rendered.ctype}" class="primitive" ${(idx == 0 ? "style=\"display:block;\"" : "style=\"display:none;\"")}>
-                            <pre class="sh_cpp">
-                                ${this.indentCPP(rendered.content)}
-                            </pre>
-                        </div>`
-                    );
+            if ((previewData.variableContent) && (previewData.variableContent.length > 0)) {
+                buttons = [];
+                pres = [];
+                const cppCodes = previewData.variableContent;
+                for (let idx = 0; idx < cppCodes.length; ++idx) {
+                    const rendered = cppCodes[idx];
+                    if (rendered.ctype != undefined) {
+                        buttons.push(
+                            `<button class="tablinks${(idx === 0 ? " active" : "")}" onclick="displayPrimitive(event, '${rendered.ctype}')">${rendered.ctype}</button>`
+                        );
+                        pres.push(
+                            `<div id="${rendered.ctype}" class="primitive" ${(idx === 0 ? "style=\"display:block;\"" : "style=\"display:none;\"")}>
+                                <pre class="sh_cpp">
+                                    ${this.indentCPP(rendered.content)}
+                                </pre>
+                            </div>`
+                        );
+                    }
                 }
-                // ${this.indentCPP(rendered.content.replaceAll("<", "&lt;").replaceAll(">", "&gt;"))}
             }
-
             return `<html>
                         <head>
                             <script type="text/javascript" src="${jsFile}"></script>
@@ -470,7 +504,7 @@ export namespace TSLEditorPreview {
             return formatted;
         }
 
-        private _getHtmlForWebview(webview: vscode.Webview, cppCode: RenderedString[]) {
+        private _getHtmlForWebview(webview: vscode.Webview, cppCode: PreviewData) {
             const mediaPath = (file: string, webView: vscode.Webview) => {
                 let uri = vscode.Uri.file(this._extContext.asAbsolutePath(FileSystemUtils.joinPath('media', file)));
                 return webView.asWebviewUri(uri).toString();

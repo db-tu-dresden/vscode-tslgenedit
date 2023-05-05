@@ -37,6 +37,17 @@ export namespace EditorUtils {
         }
         return _activeEditor.document.getText();
     }
+    export function getActiveWorkspaceFolder(): vscode.Uri | undefined {
+        const _activeDocument = getActiveDocument();
+        if (!_activeDocument) {
+            return undefined;
+        }
+        const _workspaceFolder = vscode.workspace.getWorkspaceFolder(_activeDocument.uri);
+        if (!_workspaceFolder) {
+            return undefined;
+        }
+        return _workspaceFolder.uri;
+    }
 
     
     

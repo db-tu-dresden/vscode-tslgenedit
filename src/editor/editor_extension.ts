@@ -300,25 +300,25 @@ export class TSLEditorExtension {
         });
         await vscode.commands.executeCommand('vscode.executeDocumentSymbolProvider', _document.uri);
     }
-    public async renderCurrentSelection(): Promise<TSLEditorPreview.RenderedString[]> {
+    public async renderCurrentSelection(): Promise<TSLEditorPreview.PreviewData> {
         const _currentTSLRoot = await this.getCurrentTSLRoot();
         if (!_currentTSLRoot) {
-            return [TSLEditorPreview.emptyRenderedString()];
+            return TSLEditorPreview.emptyPreview();
         }
         const _tslGenSpecs: TSLGeneratorModel.TSLGeneratorSpecs = this.openedTSLGenerators[_currentTSLRoot.fsPath];
         const _defaults = await TSLEditorTransformation.getDefaultsFromYamlSchema(_tslGenSpecs.tslgenDataSchemaFile);
         if (!_defaults) {
             vscode.window.showErrorMessage(`Could not parse default values from schema.`);
-            return [TSLEditorPreview.emptyRenderedString()];
+            return TSLEditorPreview.emptyPreview();
         }
         const _currentActiveEditor = EditorUtils.getActiveEditor();
         if (!_currentActiveEditor) {
-            return [TSLEditorPreview.emptyRenderedString()];
+            return TSLEditorPreview.emptyPreview();
         }
         const _currentActiveDocument = _currentActiveEditor.document;
         const _parsedDocuments = SerializerUtils.parseYamlDocuments(_currentActiveDocument.getText());
         if ("empty" in _parsedDocuments) {
-            return [TSLEditorPreview.emptyRenderedString()];
+            return TSLEditorPreview.emptyPreview();
         }
         const _currentCursorPosition = _currentActiveEditor.selection.active;
         const result = await TSLEditorPreview.renderSelection(

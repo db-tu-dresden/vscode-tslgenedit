@@ -15,7 +15,12 @@ export namespace SerializerUtils {
     }
     export async function dumpYamlDocuments(docs: yaml.Document.Parsed<yaml.ParsedNode>[]): Promise<string> {
         const resultPromises = docs.map(async (doc) => {
-            const result = doc.toString({directives: true}).trim();
+            let result: string = "";
+            try {
+                result = doc.toString({directives: true}).trim();
+            } catch(error) {
+                console.error(error);
+            }
             if (result.endsWith('...')) {
                 return result.slice(0, -3).trim();
             }
