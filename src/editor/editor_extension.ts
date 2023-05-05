@@ -257,7 +257,7 @@ export class TSLEditorExtension {
         }
         const _preFormattedText = await SerializerUtils.dumpYamlDocuments(_parsedDocuments);
         const regex = new RegExp('^(?<indent>\\s*)-[^-]\\s*(?<value>.+)$', 'gm');
-        const _formattedText = _preFormattedText.replaceAll(regex, `$<indent>- \n$<indent>  $<value>`);
+        const _formattedText = _preFormattedText.replaceAll(regex, `$<indent>-\n$<indent>  $<value>`);
         await _editor.edit((editBuilder) => {
             // Replace the entire text of the document with the new content
             const document = _editor.document;

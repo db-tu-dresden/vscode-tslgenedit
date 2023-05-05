@@ -58,7 +58,6 @@ export async function activate(context: vscode.ExtensionContext) {
     }));
 
     // context.subscriptions.push(vscode.languages.registerContextMenuProvider)
-    tslEditorExtension.toggleFocusMode();
     // vscode.commands.executeCommand('workbench.view.explorer');
 }
 

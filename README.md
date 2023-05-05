@@ -39,8 +39,7 @@ Render the currently selected primitive.
 
 ## Known Issues
 
-- Currently, only primitive definitions can be rendered.
-
+- /
 
 ### 0.0.1
 
@@ -64,6 +63,11 @@ Refactored Library name from TVL to TSL.
 
 - Added Sorting of Primitives in a TSL Primitive Data File.
 - Added Formating a TSL Data File.
+
+### 0.1.0
+
+- Preview rendering works for primitive-declaration, primitive-definition(s) and extension
+
 
 ### Acknowledgments
 

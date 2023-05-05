@@ -386,7 +386,6 @@ export namespace TSLEditorPreview {
              */
             let staticHtml: string = "";
 
-            console.log(previewData.staticContent);
             if (previewData.staticContent.length > 0) {
                 staticHtml = 
                 `<h3>${previewData.tslType.valueOf()}</h3><div id="${getKey(previewData.tslType)}" class="staticContent")}>
@@ -485,7 +484,6 @@ export namespace TSLEditorPreview {
             const cssPath = mediaPath("sh_style.css", webview);
             const tabCssPath = mediaPath("tab_style.css", webview);
 
-            // console.log( this.formatCPP(webview, jsPath, cppPath, cssPath, cppCode) );
             return this.formatCPP(webview, jsPath, cppPath, cssPath, tabCssPath, cppCode);
         }
     }

@@ -30,9 +30,6 @@ export namespace TSLEditorTransformation {
                     return true;
                 }
                 progress.report({ message: `Transforming ${entry.sourceFile.fsPath}...` });
-                // if (FileSystemUtils.filename(entry.sourceFile).startsWith("primitive_declaration")) {
-                //     console.log("NOW");
-                // }
                 const _updatedTemplateStr: string = TSLGeneratorTemplate.Jinja2ToTwing.transform(_origTemplateStr);
                 if (_updatedTemplateStr.length === 0) {
                     return false;
@@ -138,6 +135,7 @@ export namespace TSLEditorTransformation {
         const _primitiveDeclarationFiltered = TSLGeneratorSchema.SchemaTransform.filterDefaults(_primitiveDeclaration);
 
         const _primitiveDeclarationDefaults = TSLGeneratorSchema.SchemaTransform.createDefaultEntryFromSchema(_primitiveDeclarationFiltered);
+        _primitiveDeclarationDefaults['tsl_namespace'] = TSLGeneratorModel.tslNamespace;
         const _primitiveDefinitionDefaults = TSLGeneratorSchema.SchemaTransform.createDefaultEntryFromSchema(_primitiveDefinitionFiltered);
         return {
             extension: _extensionDefaults,
