@@ -13,13 +13,13 @@ import { EditorUtils } from '../utils/vscode_editor';
 export namespace TSLEditorPreview {
     export enum TSLDataType {
         primitiveDefinition = "Definition(s)",
-        primitiveDeclaration = "Declaration",
+        primitiveDeclaration = "Primitive Declaration",
         primitiveClass = "Primitive Class",
         extension = "Extension",
         unknown = ""
     };
     function getKey(dataType: TSLDataType): string {
-        switch(dataType) {
+        switch (dataType) {
             case TSLDataType.primitiveDefinition:
                 return "primitiveDefinition";
             case TSLDataType.primitiveDeclaration:
@@ -224,7 +224,7 @@ export namespace TSLEditorPreview {
                     `@core/extension${TSLEditorTransformation.templateFileExtension}`,
                     TypeUtils.extendObjects(_data.toJSON(), defaults.extension)),
                 tslType: TSLDataType.extension
-            };   
+            };
         }
 
         if (_fileType === TSLGeneratorModel.TSLDataFileContentType.primitive) {
@@ -297,7 +297,7 @@ export namespace TSLEditorPreview {
                     _declarationAndExtensionDataJson
                 );
 
-                const ctype_map = _ctypeArray.reduce((dict: {[key:string]: any}, ctype: string) => {
+                const ctype_map = _ctypeArray.reduce((dict: { [key: string]: any }, ctype: string) => {
                     let currentDataJson = { ..._mergedDataJson };
                     currentDataJson["ctype"] = ctype;
                     dict[ctype] = currentDataJson;
@@ -308,9 +308,9 @@ export namespace TSLEditorPreview {
                         _mergedDataJson["implementation"],
                         ctype_map
                     );
-                
+
                 const _renderedDefinitions = await Promise.all(_ctypeArray.map(async (ctype) => {
-                    const data = {...ctype_map[ctype]};
+                    const data = { ...ctype_map[ctype] };
                     data["implementation"] = _renderedImplementations[ctype];
                     try {
                         return {
@@ -376,7 +376,7 @@ export namespace TSLEditorPreview {
             }
         }
 
-        private formatCPP(webview: vscode.Webview, jsFile: string, cppFile: string, cssFile: string, previewData: PreviewData) {
+        private formatCPP(webview: vscode.Webview, jsFile: string, cppFile: string, cssFile: string, tabCssFile: string, previewData: PreviewData) {
             // Powered by https://www.w3schools.com/howto/tryit.asp?filename=tryhow_js_tabs
             let buttons: string[];
             let pres: string[];
@@ -384,15 +384,19 @@ export namespace TSLEditorPreview {
             /**
              * static content prepared here, can we add a title with cppCodes.tslType.valueOf()?
              */
-            const staticHtml: string = 
-            `<div id="${getKey(previewData.tslType)}" class="staticContent")}>
-                <pre class="sh_cpp">
-                    ${this.indentCPP(previewData.staticContent)}
-                </pre>
-            </div>`;
+            let staticHtml: string = "";
 
-            buttons = [];
-            pres = [];
+            console.log(previewData.staticContent);
+            if (previewData.staticContent.length > 0) {
+                staticHtml = 
+                `<h3>${previewData.tslType.valueOf()}</h3><div id="${getKey(previewData.tslType)}" class="staticContent")}>
+                    <pre class="sh_cpp">
+                        ${this.indentCPP(previewData.staticContent)}
+                    </pre>
+                </div>`;
+            }
+
+            let dynamicContent: string = "";
             if ((previewData.variableContent) && (previewData.variableContent.length > 0)) {
                 buttons = [];
                 pres = [];
@@ -412,12 +416,18 @@ export namespace TSLEditorPreview {
                         );
                     }
                 }
+                dynamicContent =
+                    `<h3>Definition(s)</h3><div class="tab">
+                    ${buttons.join("\n")}
+                </div>
+                ${pres.join("\n")}`;
             }
             return `<html>
                         <head>
                             <script type="text/javascript" src="${jsFile}"></script>
                             <script type="text/javascript" src="${cppFile}"></script>
                             <link type="text/css" rel="stylesheet" href="${cssFile}">
+                            <link type="text/css" rel="stylesheet" href="${tabCssFile}">
                             <meta name="viewport" content="width=device-width, initial-scale=1.0">
                             <script>
                             function displayPrimitive(evt, primitiveId) {
@@ -434,53 +444,10 @@ export namespace TSLEditorPreview {
                               evt.currentTarget.className += " active";
                             }
                             </script>
-                            <style>
-                                /* Style the tab */
-                                .tab {
-                                overflow: hidden;
-                                border: 1px solid var(--vscode-input-foreground);
-                                background-color: var(--vscode-background-color);
-                                }
-
-                                /* Style the buttons inside the tab */
-                                .tab button {
-                                background-color: inherit;
-                                float: left;
-                                border: 1px solid var(--vscode-input-foreground);
-                                outline: none;
-                                cursor: pointer;
-                                padding: 14px 16px;
-                                transition: 0.3s;
-                                font-size: 17px;
-                                color: var(--vscode-input-foreground);
-                                }
-
-                                /* Change background color of buttons on hover */
-                                .tab button:hover {
-                                background-color: var(--vscode-input-foreground);
-                                color: var(--vscode-input-background);
-                                }
-
-                                /* Create an active/current tablink class */
-                                .tab button.active {
-                                background-color: var(--vscode-input-background);
-                                color: var(--vscode-input-foreground);
-                                }
-
-                                /* Style the tab content */
-                                .primitive {
-                                display: none;
-                                padding: 6px 12px;
-                                border: 1px solid #ccc;
-                                border-top: none;
-                                }
-                                </style>
                         </head>
-                        <body onload="sh_highlightDocument();" style="backgroud: #d3d3d3;">
-                            <div class="tab">
-                                ${buttons.join("\n")}
-                            </div>
-                            ${pres.join("\n")}
+                        <body onload="sh_highlightDocument();" style="backgroud: #d3d3d3;" topmargin=5>
+                            ${staticHtml}
+                            ${dynamicContent}
                         </body>
                     </html>`;
         }
@@ -516,9 +483,10 @@ export namespace TSLEditorPreview {
             const jsPath = mediaPath("sh_main.js", webview);
             const cppPath = mediaPath("sh_cpp.js", webview);
             const cssPath = mediaPath("sh_style.css", webview);
+            const tabCssPath = mediaPath("tab_style.css", webview);
 
             // console.log( this.formatCPP(webview, jsPath, cppPath, cssPath, cppCode) );
-            return this.formatCPP(webview, jsPath, cppPath, cssPath, cppCode);
+            return this.formatCPP(webview, jsPath, cppPath, cssPath, tabCssPath, cppCode);
         }
     }
 }
