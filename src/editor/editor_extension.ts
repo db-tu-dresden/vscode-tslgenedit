@@ -7,18 +7,16 @@ import { SerializerUtils } from '../utils/serialize';
 import { TSLEditorPreview } from './preview';
 import { TSLEditorFileSymbols } from './symbols';
 import { TSLGeneratorSchema } from '../tslgen/schema';
-
-
+import { YAMLProcessingMode } from './enums';
 
 export class TSLEditorExtension {
-
     private static instance: TSLEditorExtension;
     private openedTSLGenerators: { [key: string]: TSLGeneratorModel.TSLGeneratorSpecs } = {};
     private templateManager: TSLEditorPreview.TemplateManager = TSLEditorPreview.templateManager;
     private fsWatchers: vscode.FileSystemWatcher[] = [];
     private schemaLocations: { [key: string]: TSLGeneratorSchema.SchemaFileLocations } = {};
     private schemata: { [key: string]: TSLGeneratorSchema.Schemata } = {};
-    private constructor() { 
+    private constructor() {
         this.getCurrentTSLRoot = this.getCurrentTSLRoot.bind(this);
     }
     public static getInstance(): TSLEditorExtension {
@@ -52,7 +50,7 @@ export class TSLEditorExtension {
                     } else {
                         return undefined;
                     }
-                } else {            
+                } else {
                     return undefined;
                 }
             }
@@ -60,13 +58,13 @@ export class TSLEditorExtension {
         return _currentTSLRoot;
     }
 
-    public getSchema(_currentFileUri: vscode.Uri): TSLGeneratorSchema.Schemata | undefined{
+    public getSchema(_currentFileUri: vscode.Uri): TSLGeneratorSchema.Schemata | undefined {
         const _rootFolder = TSLGeneratorModel.getTSLRootFolder(_currentFileUri);
         if (_rootFolder) {
             if (_rootFolder.fsPath in this.schemata) {
                 return this.schemata[_rootFolder.fsPath];
             }
-        } 
+        }
         return undefined;
     }
     private getTemplateTargetFolder(jinja2File: vscode.Uri) {
@@ -108,7 +106,7 @@ export class TSLEditorExtension {
                 vscode.window.showErrorMessage("Could not transform schame.");
                 return false;
             }
-    
+
             this.schemata[specs.tslgenRootFolder.fsPath] = _schemata as TSLGeneratorSchema.Schemata;
             // this.schemaLocations[specs.tslgenRootFolder.fsPath] = _schemaTransformationLocation;
             return true;
@@ -155,7 +153,7 @@ export class TSLEditorExtension {
                         progress.report({ message: `Creating FileSystemWatchers for ${_templateWatcherPattern}` });
                         const _templateWatcher = vscode.workspace.createFileSystemWatcher(_templateWatcherPattern);
                         _templateWatcher.onDidCreate(async (uri) => {
-                            let transformationTargets : TSLEditorTransformation.TransformationTarget[];
+                            let transformationTargets: TSLEditorTransformation.TransformationTarget[];
                             if (await FileSystemUtils.isDirectory(uri)) {
                                 transformationTargets = (await FileSystemUtils.iterFiles(uri, TSLGeneratorModel.tslGenTemplateFileExtension)).map((templateFile) => {
                                     return {
@@ -173,7 +171,7 @@ export class TSLEditorExtension {
                             }
                         });
                         _templateWatcher.onDidChange(async (uri) => {
-                            let transformationTargets : TSLEditorTransformation.TransformationTarget[];
+                            let transformationTargets: TSLEditorTransformation.TransformationTarget[];
                             if (await FileSystemUtils.isDirectory(uri)) {
                                 transformationTargets = (await FileSystemUtils.iterFiles(uri, TSLGeneratorModel.tslGenTemplateFileExtension)).map((templateFile) => {
                                     return {
@@ -237,7 +235,7 @@ export class TSLEditorExtension {
     public async formatFile() {
         const _currentTSLRoot = TSLGeneratorModel.getTSLRootFolderForCurrentActiveFile();
         if (!_currentTSLRoot) {
-            return ;
+            return;
         }
         const _editor = EditorUtils.getActiveEditor();
         if (!_editor) {
@@ -245,15 +243,15 @@ export class TSLEditorExtension {
         }
         const _document = EditorUtils.getActiveDocument();
         if (!_document) {
-            return ;
+            return;
         }
         const _documentText = _document.getText();
         if (_documentText.length === 0) {
-            return ;
+            return;
         }
         const _parsedDocuments = SerializerUtils.parseYamlDocuments(_documentText);
         if ("empty" in _parsedDocuments) {
-            return ;
+            return;
         }
         const _preFormattedText = await SerializerUtils.dumpYamlDocuments(_parsedDocuments);
         const regex = new RegExp('^(?<indent>\\s*)-[^-]\\s*(?<value>.+)$', 'gm');
@@ -271,7 +269,7 @@ export class TSLEditorExtension {
     public async sortFile() {
         const _currentTSLRoot = TSLGeneratorModel.getTSLRootFolderForCurrentActiveFile();
         if (!_currentTSLRoot) {
-            return ;
+            return;
         }
         const _editor = EditorUtils.getActiveEditor();
         if (!_editor) {
@@ -279,15 +277,15 @@ export class TSLEditorExtension {
         }
         const _document = EditorUtils.getActiveDocument();
         if (!_document) {
-            return ;
+            return;
         }
         const _documentText = _document.getText();
         if (_documentText.length === 0) {
-            return ;
+            return;
         }
         const _parsedDocuments = SerializerUtils.parseYamlDocuments(_documentText);
         if ("empty" in _parsedDocuments) {
-            return ;
+            return;
         }
         const _sortedDocuments = await TSLGeneratorModel.sortPrimitives(_parsedDocuments);
         const _sortedText = await SerializerUtils.dumpYamlDocuments(_sortedDocuments);
@@ -300,33 +298,54 @@ export class TSLEditorExtension {
         });
         await vscode.commands.executeCommand('vscode.executeDocumentSymbolProvider', _document.uri);
     }
-    public async renderCurrentSelection(): Promise<TSLEditorPreview.PreviewData> {
+    public async renderCurrentSelection(mode: YAMLProcessingMode): Promise<TSLEditorPreview.PreviewData | TSLEditorPreview.PreviewMetaData> {
         const _currentTSLRoot = await this.getCurrentTSLRoot();
         if (!_currentTSLRoot) {
-            return TSLEditorPreview.emptyPreview();
+            switch (mode) {
+                case YAMLProcessingMode.PreviewInPanel:
+                    return TSLEditorPreview.emptyPreview();
+                case YAMLProcessingMode.BuildRunAndTest:
+                    return TSLEditorPreview.emptyPreviewMetaData();
+            }
         }
         const _tslGenSpecs: TSLGeneratorModel.TSLGeneratorSpecs = this.openedTSLGenerators[_currentTSLRoot.fsPath];
         const _defaults = await TSLEditorTransformation.getDefaultsFromYamlSchema(_tslGenSpecs.tslgenDataSchemaFile);
         if (!_defaults) {
             vscode.window.showErrorMessage(`Could not parse default values from schema.`);
-            return TSLEditorPreview.emptyPreview();
+            switch (mode) {
+                case YAMLProcessingMode.PreviewInPanel:
+                    return TSLEditorPreview.emptyPreview();
+                case YAMLProcessingMode.BuildRunAndTest:
+                    return TSLEditorPreview.emptyPreviewMetaData();
+            }
         }
         const _currentActiveEditor = EditorUtils.getActiveEditor();
         if (!_currentActiveEditor) {
-            return TSLEditorPreview.emptyPreview();
+            switch (mode) {
+                case YAMLProcessingMode.PreviewInPanel:
+                    return TSLEditorPreview.emptyPreview();
+                case YAMLProcessingMode.BuildRunAndTest:
+                    return TSLEditorPreview.emptyPreviewMetaData();
+            }
         }
         const _currentActiveDocument = _currentActiveEditor.document;
         const _parsedDocuments = SerializerUtils.parseYamlDocuments(_currentActiveDocument.getText());
         if ("empty" in _parsedDocuments) {
-            return TSLEditorPreview.emptyPreview();
+            switch (mode) {
+                case YAMLProcessingMode.PreviewInPanel:
+                    return TSLEditorPreview.emptyPreview();
+                case YAMLProcessingMode.BuildRunAndTest:
+                    return TSLEditorPreview.emptyPreviewMetaData();
+            }
         }
         const _currentCursorPosition = _currentActiveEditor.selection.active;
         const result = await TSLEditorPreview.renderSelection(
-            _tslGenSpecs, 
+            _tslGenSpecs,
             _defaults,
-            _currentActiveDocument, 
-            _parsedDocuments, 
-            _currentCursorPosition);
+            _currentActiveDocument,
+            _parsedDocuments,
+            _currentCursorPosition,
+            mode);
         return result;
     }
 
@@ -341,8 +360,8 @@ export class TSLEditorExtension {
     }
     private async getQuickPickInput(values: string[], title: string, description: string): Promise<string> {
         const _result = await vscode.window.showQuickPick(
-            values, 
-            { 
+            values,
+            {
                 title: title,
                 placeHolder: description
             });
@@ -393,15 +412,15 @@ export class TSLEditorExtension {
             if (! await FileSystemUtils.createDir(FileSystemUtils.truncateFile(_fileUri))) {
                 return;
             }
-            if (! 
+            if (!
                 await FileSystemUtils.writeFile(
-                    _fileUri, 
+                    _fileUri,
                     _fileValue)) {
                 return;
             }
             const doc = await vscode.workspace.openTextDocument(_fileUri);
             await vscode.window.showTextDocument(doc);
-            return;            
+            return;
         } else if (_fileTypeString === "Primitive Class") {
             const _primitiveClassName = `Insert a concise and explicit name of the new primitive class.
             The primitive class should only consist of characters, e.g., 'ls', 'calc'.`;
@@ -419,15 +438,15 @@ export class TSLEditorExtension {
             const _primitivieClassDescription = _primitiveClassDescriptionInput.trim();
             const _fileValue = `---\n#Preamble\nname: "${_fileNameNormalized}"\ndescription: "${_primitivieClassDescription}"\n...`;
             const _fileUri = FileSystemUtils.addPathToUri(_currentSpecs.tslgenPrimitiveDataFolder, _fileName);
-            if (! 
+            if (!
                 await FileSystemUtils.writeFile(
-                    _fileUri, 
+                    _fileUri,
                     _fileValue)) {
                 return;
             }
             const doc = await vscode.workspace.openTextDocument(_fileUri);
             await vscode.window.showTextDocument(doc);
-            return;            
+            return;
         }
     }
     /**
@@ -446,20 +465,20 @@ export class TSLEditorExtension {
         }
         const _tslToRoot = vscode.workspace.asRelativePath(_currentTSLRoot, false);
         const _pattern = (_tslToRoot === _currentTSLRoot.fsPath) ? "**" : `**${FileSystemUtils.separator}${_tslToRoot}`;
-        
+
         const _currentSpecs = this.openedTSLGenerators[_currentTSLRoot.fsPath];
-        const _irrelevantEntries = 
+        const _irrelevantEntries =
             (await FileSystemUtils.getDirectories(_currentSpecs.tslgenRootFolder, false))
-            .filter((entry) => entry.fsPath !== _currentSpecs.tslgenDataFolder.fsPath)
-            .map((entry) => `${_pattern}${FileSystemUtils.separator}${FileSystemUtils.baseName(entry)}`)
-            .concat(
-                (await FileSystemUtils.getFiles(_currentSpecs.tslgenRootFolder, false))
-                .map((fileEntry) => `${_pattern}${FileSystemUtils.separator}${FileSystemUtils.baseName(fileEntry)}`)
-            );
+                .filter((entry) => entry.fsPath !== _currentSpecs.tslgenDataFolder.fsPath)
+                .map((entry) => `${_pattern}${FileSystemUtils.separator}${FileSystemUtils.baseName(entry)}`)
+                .concat(
+                    (await FileSystemUtils.getFiles(_currentSpecs.tslgenRootFolder, false))
+                        .map((fileEntry) => `${_pattern}${FileSystemUtils.separator}${FileSystemUtils.baseName(fileEntry)}`)
+                );
         const _config = vscode.workspace.getConfiguration();
         const _filesExclude = _config.get<EditorUtils.FilesVisibility>('files.exclude') ?? {};
         const _alreadyPresentEntry = _irrelevantEntries.find((item) => _filesExclude.hasOwnProperty(item));
-        const _visibility = (init) ? true : ((_alreadyPresentEntry)? !(_filesExclude[_alreadyPresentEntry]) : true);
+        const _visibility = (init) ? true : ((_alreadyPresentEntry) ? !(_filesExclude[_alreadyPresentEntry]) : true);
         for (const entry of _irrelevantEntries) {
             _filesExclude[entry] = _visibility;
         }

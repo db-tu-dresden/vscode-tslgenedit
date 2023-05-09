@@ -9,6 +9,7 @@ import { FileSystemUtils } from '../utils/files';
 import { TSLEditorTransformation } from './transform';
 import { TypeUtils } from '../utils/types';
 import { EditorUtils } from '../utils/vscode_editor';
+import { YAMLProcessingMode } from './enums';
 
 export namespace TSLEditorPreview {
     export enum TSLDataType {
@@ -41,6 +42,11 @@ export namespace TSLEditorPreview {
         tslType: TSLDataType;
         variableContent?: RenderedString[];
     }
+    export interface PreviewMetaData {
+        extension_name: string;
+        primitive_name: string;
+        buildable: boolean;
+    }
     function emptyRenderedString(): RenderedString {
         return {
             content: ""
@@ -50,6 +56,13 @@ export namespace TSLEditorPreview {
         return {
             staticContent: "",
             tslType: TSLDataType.unknown
+        };
+    }
+    export function emptyPreviewMetaData(): PreviewMetaData {
+        return {
+            extension_name: "",
+            primitive_name: "",
+            buildable: false
         };
     }
     function isPreviewEmpty(data: PreviewData): boolean {
@@ -207,24 +220,40 @@ export namespace TSLEditorPreview {
         defaults: TSLEditorTransformation.DefaultsFromSchema,
         currentDocument: vscode.TextDocument,
         documents: SerializerUtils.YamlDocument[],
-        cursorPosition: vscode.Position
-    ): Promise<PreviewData> {
+        cursorPosition: vscode.Position,
+        mode: YAMLProcessingMode
+    ): Promise<PreviewData | PreviewMetaData> {
         const _fileType = TSLGeneratorModel.determineDataFileType(documents);
         if (_fileType === TSLGeneratorModel.TSLDataFileContentType.unknown) {
-            return emptyPreview();
+            switch (mode) {
+                case YAMLProcessingMode.PreviewInPanel:
+                    return TSLEditorPreview.emptyPreview();
+                case YAMLProcessingMode.BuildRunAndTest:
+                    return TSLEditorPreview.emptyPreviewMetaData();
+            }
         }
         const _data = SerializerUtils.Search.getCurrentFocusedYamlDocument(documents, currentDocument, cursorPosition);
         if (!_data) {
-            return emptyPreview();
+            switch (mode) {
+                case YAMLProcessingMode.PreviewInPanel:
+                    return TSLEditorPreview.emptyPreview();
+                case YAMLProcessingMode.BuildRunAndTest:
+                    return TSLEditorPreview.emptyPreviewMetaData();
+            }
         }
         if (_fileType === TSLGeneratorModel.TSLDataFileContentType.extension) {
-            return {
-                staticContent: await templateManager.render(
-                    tslSpecs.tslgenTemplateRootFolder,
-                    `@core/extension${TSLEditorTransformation.templateFileExtension}`,
-                    TypeUtils.extendObjects(_data.toJSON(), defaults.extension)),
-                tslType: TSLDataType.extension
-            };
+            switch (mode) {
+                case YAMLProcessingMode.PreviewInPanel:
+                    return {
+                        staticContent: await templateManager.render(
+                            tslSpecs.tslgenTemplateRootFolder,
+                            `@core/extension${TSLEditorTransformation.templateFileExtension}`,
+                            TypeUtils.extendObjects(_data.toJSON(), defaults.extension)),
+                        tslType: TSLDataType.extension
+                    };
+                case YAMLProcessingMode.BuildRunAndTest:
+                    return TSLEditorPreview.emptyPreviewMetaData();
+            }
         }
 
         if (_fileType === TSLGeneratorModel.TSLDataFileContentType.primitive) {
@@ -258,31 +287,50 @@ export namespace TSLEditorPreview {
                 }
             }
             if (!_selectedDefinitionItem) {
-                return {
-                    staticContent: await templateManager.render(
-                        tslSpecs.tslgenTemplateRootFolder,
-                        `@core/primitive_declaration${TSLEditorTransformation.templateFileExtension}`,
-                        TypeUtils.extendObjects(_declarationJson, defaults.primitiveDeclaration)
-                    ),
-                    tslType: TSLDataType.primitiveDeclaration
-                };
+                switch (mode) {
+                    case YAMLProcessingMode.PreviewInPanel:
+                        return {
+                            staticContent: await templateManager.render(
+                                tslSpecs.tslgenTemplateRootFolder,
+                                `@core/primitive_declaration${TSLEditorTransformation.templateFileExtension}`,
+                                TypeUtils.extendObjects(_declarationJson, defaults.primitiveDeclaration)
+                            ),
+                            tslType: TSLDataType.primitiveDeclaration
+                        };
+                    case YAMLProcessingMode.BuildRunAndTest:
+                        return TSLEditorPreview.emptyPreviewMetaData();
+                }
             } else {
                 const _definition = _selectedDefinitionItem as yaml.YAMLMap<unknown, unknown>;
                 const _ctypes = _definition.get("ctype");
                 if (!_ctypes) {
                     vscode.window.showErrorMessage(`Please specify a ctype.`);
-                    return emptyPreview();
+                    switch (mode) {
+                        case YAMLProcessingMode.PreviewInPanel:
+                            return TSLEditorPreview.emptyPreview();
+                        case YAMLProcessingMode.BuildRunAndTest:
+                            return TSLEditorPreview.emptyPreviewMetaData();
+                    }
                 }
                 const _extensionNameItem = _definition.get("target_extension");
                 if (!_extensionNameItem) {
                     vscode.window.showErrorMessage(`Please specify an extension.`);
-                    return emptyPreview();
+                    switch (mode) {
+                        case YAMLProcessingMode.PreviewInPanel:
+                            return TSLEditorPreview.emptyPreview();
+                        case YAMLProcessingMode.BuildRunAndTest:
+                            return TSLEditorPreview.emptyPreviewMetaData();
+                    }
                 }
                 const _flags = _definition.get("lscpu_flags");
                 const _flagsStr: string = (_flags) ? ((yaml.isCollection(_flags)) ? _flags.items.join(", ") : `${_flags}`) : "";
                 _definition.set("lscpu_flags", _flagsStr);
                 const _extensionName = `${_extensionNameItem}`;
                 const _extensionData = await getTSLExtensionDocument(tslSpecs, _extensionName);
+
+                if ( mode == YAMLProcessingMode.BuildRunAndTest ) {
+                    return { extension_name: `${_extensionName}`, primitive_name: _data.get("functor_name") as string, buildable: true };
+                }
 
                 const _extensionDataJson = ((_extensionData) && (yaml.isDocument(_extensionData))) ? _extensionData.toJSON() : {};
 
@@ -340,7 +388,6 @@ export namespace TSLEditorPreview {
         return emptyPreview();
     }
 
-
     export class TSLGenViewProvider implements vscode.WebviewViewProvider {
         public static readonly viewType = 'tslgen-edit.generatedCodePreview';
         private _view?: vscode.WebviewView;
@@ -387,8 +434,8 @@ export namespace TSLEditorPreview {
             let staticHtml: string = "";
 
             if (previewData.staticContent.length > 0) {
-                staticHtml = 
-                `<h3>${previewData.tslType.valueOf()}</h3><div id="${getKey(previewData.tslType)}" class="staticContent")}>
+                staticHtml =
+                    `<h3>${previewData.tslType.valueOf()}</h3><div id="${getKey(previewData.tslType)}" class="staticContent")}>
                     <pre class="sh_cpp">
                         ${this.indentCPP(previewData.staticContent)}
                     </pre>
