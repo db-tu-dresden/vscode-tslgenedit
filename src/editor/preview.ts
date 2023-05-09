@@ -328,7 +328,7 @@ export namespace TSLEditorPreview {
                 const _extensionName = `${_extensionNameItem}`;
                 const _extensionData = await getTSLExtensionDocument(tslSpecs, _extensionName);
 
-                if ( mode == YAMLProcessingMode.BuildRunAndTest ) {
+                if ( mode === YAMLProcessingMode.BuildRunAndTest ) {
                     return { extension_name: `${_extensionName}`, primitive_name: _data.get("functor_name") as string, buildable: true };
                 }
 
@@ -382,7 +382,7 @@ export namespace TSLEditorPreview {
                     ),
                     tslType: TSLDataType.primitiveDeclaration,
                     variableContent: _renderedDefinitions
-                }
+                };
             }
         }
         return emptyPreview();
@@ -449,7 +449,7 @@ export namespace TSLEditorPreview {
                 const cppCodes = previewData.variableContent;
                 for (let idx = 0; idx < cppCodes.length; ++idx) {
                     const rendered = cppCodes[idx];
-                    if (rendered.ctype != undefined) {
+                    if (rendered.ctype !== undefined) {
                         buttons.push(
                             `<button class="tablinks${(idx === 0 ? " active" : "")}" onclick="displayPrimitive(event, '${rendered.ctype}')">${rendered.ctype}</button>`
                         );

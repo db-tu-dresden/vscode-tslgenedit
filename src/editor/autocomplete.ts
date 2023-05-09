@@ -14,11 +14,11 @@ export namespace TSLEditorAutoComplete {
     export class YAMLCompletionProvider implements CompletionItemProvider {
         private readonly indent: string = '  ';
 
-        private objectToIndentedString(obj: any, currentIndent: string) {
+        private objectToIndentedString(obj: any, currentIndent: string, keepFirstIndent: boolean = true) {
             let _result: string[] = [];
             for (const key in obj) {
                 if (obj[key]["minValue"] === 1) {
-                    let _current = `${currentIndent}${key}: `;
+                    let _current = `${key}: `;
                     const _type = obj[key]["type"];
                     if (_type === 'string') {
                         _current += "''";
@@ -26,9 +26,15 @@ export namespace TSLEditorAutoComplete {
                         _current += "[]";
                     } else if(_type === 'dict') {
                         _current += "{}";
-                    }
+                    } 
                     _result.push(_current);
                 }
+            }
+            if (keepFirstIndent) {
+                _result[0] = `${currentIndent}${_result[0]}`;
+            }
+            for (let i = 1; i < _result.length; i++) {
+                _result[i] = `${currentIndent}${_result[i]}`;
             }
             return _result.join("\n");
         }
@@ -113,8 +119,8 @@ export namespace TSLEditorAutoComplete {
                     const key = _schemaPropertyKeys[_schemaPropertyKeys.length-1];
                     const completionItem = new CompletionItem(`New Element of ${key}:`, CompletionItemKind.Class);
                     const _items = _currentSchema["items"];
-                    const _snippet = this.objectToIndentedString(_items, this.indent);
-                    completionItem.insertText = new SnippetString(`-\n${_snippet}`);
+                    const _snippet = this.objectToIndentedString(_items, this.indent, false);
+                    completionItem.insertText = new SnippetString(`- ${_snippet}`);
                     const suggestions: CompletionItem[] = [completionItem];
                     return new Promise((resolve, rejects) => {resolve(suggestions);});
                 }

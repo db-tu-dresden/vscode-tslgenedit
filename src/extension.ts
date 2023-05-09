@@ -81,18 +81,14 @@ export async function activate(context: vscode.ExtensionContext) {
             tslTerminal.sendText(`cd ${tslPwd?.fsPath}`);
             tslTerminal.sendText(`cmake -S . -B ${tslTempDir} -UTSL_LSCPU_FLAGS -DTSL_FILTER_FOR_PRIMITIVES="${_data.primitive_name}"`);
             tslTerminal.sendText(`make -C ${tslTempDir}`);
-<<<<<<< HEAD
             tslTerminal.sendText(`${tslTempDir}/${tslTempBuildDir}/generator_output/src/test/tsl_test \"[${_data.extension_name}][${_data.primitive_name}]\"`);
-=======
-            tslTerminal.sendText(`${tslTempDir}/${tslTempBuildDir}/generator_output/src/test/tsl_test [${_data.extension_name}][${_data.primitive_name}]`);
->>>>>>> a50b7a73629ac5895ba1a2216a3a14178b6d5b03
         } else {
             vscode.window.showErrorMessage(`No buildable primitive selected.`);
         }
     }));
 
     vscode.window.onDidCloseTerminal((terminal) => {
-        if (terminal.name == TSL_TERMINAL_IDENT) {
+        if (terminal.name === TSL_TERMINAL_IDENT) {
             tslTerminal?.dispose();
             tslTerminal = undefined;
         }
