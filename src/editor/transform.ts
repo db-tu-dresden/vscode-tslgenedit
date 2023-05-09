@@ -11,6 +11,10 @@ export namespace TSLEditorTransformation {
         sourceFile: vscode.Uri;
         targetFolder: vscode.Uri;
     }
+    interface TransformationFiles {
+        source: FileSystemUtils.MutableFile;
+        target: FileSystemUtils.MutableFile;
+    }
     export const templateFileExtension = ".twig";
     export const schemaFileExtension = ".json";
 
@@ -20,10 +24,43 @@ export namespace TSLEditorTransformation {
         primitiveDefinition: SerializerUtils.JSONNode
     }
 
+    export async function filterTransformationTargets(transformationTargets: TransformationTarget[]): Promise<TransformationFiles[]> {
+        const results = await Promise.allSettled(
+          transformationTargets.map(async ({ sourceFile, targetFolder }) => {
+            const targetFile = FileSystemUtils.addPathToUri(targetFolder, FileSystemUtils.filenameWithExtension(sourceFile, templateFileExtension));
+      
+            try {
+              const [sourceStats, targetStats] = await Promise.all([
+                FileSystemUtils.getFileStats(sourceFile),
+                FileSystemUtils.getFileStats(targetFile)
+              ]);
+      
+              if (sourceStats.mtime > targetStats.mtime || !targetStats.isFile()) {
+                return { source: { uri: sourceFile, stat: sourceStats }, target: { uri: targetFile, stat: targetStats } };
+              }
+            } catch (error) {
+              console.error(`Error getting file stats for ${sourceFile} or ${targetFile}: ${error}`);
+            }
+          })
+        );
+      
+        const transformationFiles: TransformationFiles[] = [];
+        for (const result of results) {
+          if (result.status === 'fulfilled' && result.value) {
+            transformationFiles.push(result.value);
+          }
+        }
+        return transformationFiles;
+      }
+      
+
     export async function transformTemplates(transformationTargets: TransformationTarget[]): Promise<boolean> {
+        const _transformationTargets = (await filterTransformationTargets(transformationTargets)).map(
+            ({ source, target }) => ({ sourceFile: source.uri, targetFile: target.uri })
+        );
         const progressOptions = { location: vscode.ProgressLocation.Notification, title: `Transforming Templates...` };
         const progressCallback = async (progress: vscode.Progress<{ message?: string; }>) => {
-            const allTransformed: boolean[] = await Promise.all(transformationTargets.map(async (entry) => {
+            const allTransformed: boolean[] = await Promise.all(_transformationTargets.map(async (entry) => {
                 progress.report({ message: `Reading ${entry.sourceFile.fsPath}...` });
                 const _origTemplateStr: string = await FileSystemUtils.readFile(entry.sourceFile);
                 if (_origTemplateStr.length === 0) {
@@ -34,7 +71,7 @@ export namespace TSLEditorTransformation {
                 if (_updatedTemplateStr.length === 0) {
                     return false;
                 }
-                const _targetFile: vscode.Uri = FileSystemUtils.addPathToUri(entry.targetFolder, FileSystemUtils.filenameWithExtension(entry.sourceFile, templateFileExtension));
+                const _targetFile: vscode.Uri = entry.targetFile;
                 progress.report({ message: `Writing ${_targetFile.fsPath}...` });
                 const _writeSuccess = await FileSystemUtils.writeFile(_targetFile, _updatedTemplateStr);
                 return _writeSuccess;

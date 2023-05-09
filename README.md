@@ -11,31 +11,43 @@ Currently, the extension supports the following features:
 
 Adding new data files to the TSL Generator folder.
 
-![](docu/new_file.gif)
+![](docu/new_file.webm)
 
 ### __Focus-Mode__
 
 Hide all TSL Generator directories and files which are not relevant for you.
 
-![](docu/focus.gif)
+![](docu/focus.webm)
 
 ### __Outlining__
 
 Add relevant links of a document to the outline
 
-![](docu/outline.gif)
+![](docu/outline.webm)
 
 ### __Auto-Completion__
 
 Get suggestions for possible keys. Create object sceletons for complex objects
 
-![](docu/auto_complete.gif)
+![](docu/autocomplete.webm)
+
+### __Sort Data File__
+
+Sort file on [Primitive Name], sort definitions on [Extension and Flags].
+
+![](docu/sort.webm)
 
 ### __Ad-Hoc Preview__
 
 Render the currently selected primitive.
 
-![](docu/preview.gif)
+![](docu/ad_hoc_preview.webm.mov)
+
+### __Build and Test__
+
+Generate the necessary code for a single primitive and execute associated tests.
+
+![](docu/build_and_test.webm)
 
 ## Known Issues
 
@@ -67,6 +79,11 @@ Refactored Library name from TVL to TSL.
 ### 0.1.0
 
 - Preview rendering works for primitive-declaration, primitive-definition(s) and extension
+
+### 0.1.1
+
+- Added Building and Testing capabilities
+- Improved auto-completion
 
 
 ### Acknowledgments

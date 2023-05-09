@@ -143,16 +143,16 @@ export namespace TSLEditorAutoComplete {
                     completionItem.documentation = new MarkdownString(_currentSchema[key]["comment"]);
                     if (_currentSchema[key]["type"] === 'array') {
                         if (typeof _currentSchema[key]["items"] === 'string') {
-                            completionItem.insertText = this.createSnippet(`${key}: []`, _alreadyPresentText);
+                            completionItem.insertText = this.createSnippet(`${key}: []`, '');
                         } else {
                             const _currentIndent = `${this.indent}${_indentation}`;
                             const _nextLevelIndent = `${_currentIndent}${this.indent}`;
-                            completionItem.insertText = this.createSnippet(`${key}:\n${_currentIndent}-\n${this.objectToIndentedString(_currentSchema[key]["items"], _nextLevelIndent)}`, _alreadyPresentText);
+                            completionItem.insertText = this.createSnippet(`${key}:\n${_currentIndent}- ${this.objectToIndentedString(_currentSchema[key]["items"], _nextLevelIndent, false)}`, _alreadyPresentText);
                         }
                     } else if (_currentSchema[key]["type"] === 'dict') {
-                        completionItem.insertText = this.createSnippet(`${key}:\n${this.objectToIndentedString(_currentSchema[key]["items"], this.indent)}`, _alreadyPresentText);
+                        completionItem.insertText = this.createSnippet(`${key}:\n${this.objectToIndentedString(_currentSchema[key]["items"], this.indent)}`, '');
                     } else {
-                        completionItem.insertText = this.createSnippet(`${key}: `, _alreadyPresentText);
+                        completionItem.insertText = this.createSnippet(`${key}: `, '');
                     }
                     suggestions.push(completionItem);
                 }
