@@ -23,7 +23,6 @@ export async function activate(context: vscode.ExtensionContext) {
             { scheme: 'file', language: 'yaml' },
             new TSLEditorAutoComplete.YAMLCompletionProvider(),
             // '\w'
-            // '*'
             ...'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
         )
     );

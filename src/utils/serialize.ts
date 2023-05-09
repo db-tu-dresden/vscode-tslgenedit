@@ -43,6 +43,9 @@ export namespace SerializerUtils {
     export function getIndentation(line: string): string {
         return line.match(/^\s*/)?.[0] ?? '';
     }
+    export function getTextBeforePosition(lineUntilCursor: string): string {
+        return lineUntilCursor.match(/^\s*(.+)/)?.[1] ?? '';
+    }
     function relevantLine(line: string): boolean {
         const m = line.match(/^\s*#/);
         if (m) {

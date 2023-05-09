@@ -16,6 +16,8 @@ export namespace FileSystemUtils {
         stat: fs.Stats;
     }
 
+    export type FileStats = fs.Stats;
+
     export function addPathToUri(basePath: vscode.Uri | string, ...toAddPath: (vscode.Uri | string)[]): vscode.Uri {
         const _basePath: vscode.Uri = toUri(basePath);
         return _basePath.with({ path: _basePath.fsPath + separator + [...toAddPath].filter(str => str !?? '').join(separator) });
@@ -152,6 +154,11 @@ export namespace FileSystemUtils {
         } else {
             return _files;
         }
+    }
+
+    export async function getFileStats(uri: vscode.Uri | string): Promise<fs.Stats> {
+        const _uri = toUri(uri);
+        return fs.promises.stat(_uri.fsPath);
     }
     export async function iterFiles(startUri: vscode.Uri | string, fileExtension: string | undefined = undefined): Promise<MutableFile[]> {
 

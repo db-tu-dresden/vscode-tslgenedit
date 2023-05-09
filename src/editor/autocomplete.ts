@@ -38,6 +38,16 @@ export namespace TSLEditorAutoComplete {
             }
             return _result.join("\n");
         }
+
+        private createSnippet(snippetString: string, alreadyPresentText: string): SnippetString {
+            if (snippetString.startsWith(alreadyPresentText)) {
+                return new SnippetString(snippetString.substring(alreadyPresentText.length));
+            } else {
+                return new SnippetString(snippetString);    
+            }
+            // return new SnippetString(`${_docStartToken}\n${_snippet}\n${_docEndToken}`);
+        }
+
         public provideCompletionItems(document: TextDocument, position: Position, token: CancellationToken): Promise<CompletionItem[]> {
             const _schema = tslEditorExtension.getSchema(document.uri);
 
@@ -84,8 +94,10 @@ export namespace TSLEditorAutoComplete {
                     return new Promise((resolve, reject) => { return []; });
                 }
             }
-
-            const _indentation = SerializerUtils.getIndentation(document.lineAt(position.line).text);
+            
+            const _line = document.lineAt(position.line).text;
+            const _indentation = SerializerUtils.getIndentation(_line);
+            const _alreadyPresentText = SerializerUtils.getTextBeforePosition(_line.substring(0, position.character));
             if (_schemaPropertyKeys) {
                 if ((_schemaPropertyKeys.length === 0) && (_sameLevelKeys.length === 0)) {
                     //new document
@@ -102,7 +114,7 @@ export namespace TSLEditorAutoComplete {
                     const completionItem = new CompletionItem(`New ${_documentType.valueOf()}:`, CompletionItemKind.Class);
                     completionItem.keepWhitespace = false;
                     const _snippet = this.objectToIndentedString(_currentSchema, '');
-                    completionItem.insertText = new SnippetString(`${_docStartToken}\n${_snippet}\n${_docEndToken}`);
+                    completionItem.insertText = this.createSnippet(`${_docStartToken}\n${_snippet}\n${_docEndToken}`, _alreadyPresentText);
                     completionItem.additionalTextEdits = [TextEdit.delete(document.lineAt(position.line).range)];
                 
                     const suggestions: CompletionItem[] = [completionItem];
@@ -120,7 +132,7 @@ export namespace TSLEditorAutoComplete {
                     const completionItem = new CompletionItem(`New Element of ${key}:`, CompletionItemKind.Class);
                     const _items = _currentSchema["items"];
                     const _snippet = this.objectToIndentedString(_items, this.indent, false);
-                    completionItem.insertText = new SnippetString(`- ${_snippet}`);
+                    completionItem.insertText = this.createSnippet(`- ${_snippet}`, _alreadyPresentText);
                     const suggestions: CompletionItem[] = [completionItem];
                     return new Promise((resolve, rejects) => {resolve(suggestions);});
                 }
@@ -131,16 +143,16 @@ export namespace TSLEditorAutoComplete {
                     completionItem.documentation = new MarkdownString(_currentSchema[key]["comment"]);
                     if (_currentSchema[key]["type"] === 'array') {
                         if (typeof _currentSchema[key]["items"] === 'string') {
-                            completionItem.insertText = new SnippetString(`${key}: []`);
+                            completionItem.insertText = this.createSnippet(`${key}: []`, _alreadyPresentText);
                         } else {
                             const _currentIndent = `${this.indent}${_indentation}`;
                             const _nextLevelIndent = `${_currentIndent}${this.indent}`;
-                            completionItem.insertText = new SnippetString(`${key}:\n${_currentIndent}-\n${this.objectToIndentedString(_currentSchema[key]["items"], _nextLevelIndent)}`);
+                            completionItem.insertText = this.createSnippet(`${key}:\n${_currentIndent}-\n${this.objectToIndentedString(_currentSchema[key]["items"], _nextLevelIndent)}`, _alreadyPresentText);
                         }
                     } else if (_currentSchema[key]["type"] === 'dict') {
-                        completionItem.insertText = new SnippetString(`${key}:\n${this.objectToIndentedString(_currentSchema[key]["items"], this.indent)}`);
+                        completionItem.insertText = this.createSnippet(`${key}:\n${this.objectToIndentedString(_currentSchema[key]["items"], this.indent)}`, _alreadyPresentText);
                     } else {
-                        completionItem.insertText = new SnippetString(`${key}: `);
+                        completionItem.insertText = this.createSnippet(`${key}: `, _alreadyPresentText);
                     }
                     suggestions.push(completionItem);
                 }
