@@ -8,6 +8,7 @@ import { TSLEditorPreview } from './preview';
 import { TSLEditorFileSymbols } from './symbols';
 import { TSLGeneratorSchema } from '../tslgen/schema';
 import { YAMLProcessingMode } from './enums';
+import { TypeUtils } from '../utils/types';
 
 export class TSLEditorExtension {
     private static instance: TSLEditorExtension;
@@ -27,7 +28,7 @@ export class TSLEditorExtension {
     }
 
     private async getCurrentTSLRoot(silent: boolean = false): Promise<vscode.Uri | undefined> {
-        const _currentTSLRoot = await TSLGeneratorModel.getTSLRootFolderForCurrentActiveFile();
+        const _currentTSLRoot = TSLGeneratorModel.getTSLRootFolderForCurrentActiveFile();
         if (!_currentTSLRoot) {
             return undefined;
         }
@@ -463,36 +464,140 @@ export class TSLEditorExtension {
         if (!_currentTSLRoot) {
             return;
         }
+
         const _tslToRoot = vscode.workspace.asRelativePath(_currentTSLRoot, false);
         const _pattern = (_tslToRoot === _currentTSLRoot.fsPath) ? "**" : `**${FileSystemUtils.separator}${_tslToRoot}`;
 
         const _currentSpecs = this.openedTSLGenerators[_currentTSLRoot.fsPath];
-        const _irrelevantEntries =
-            (await FileSystemUtils.getDirectories(_currentSpecs.tslgenRootFolder, false))
-                .filter((entry) => entry.fsPath !== _currentSpecs.tslgenDataFolder.fsPath)
-                .map((entry) => `${_pattern}${FileSystemUtils.separator}${FileSystemUtils.baseName(entry)}`)
-                .concat(
-                    (await FileSystemUtils.getFiles(_currentSpecs.tslgenRootFolder, false))
-                        .map((fileEntry) => `${_pattern}${FileSystemUtils.separator}${FileSystemUtils.baseName(fileEntry)}`)
-                );
+        const _irrelevantEntries = (await FileSystemUtils.getDirectories(_currentSpecs.tslgenRootFolder, false))
+            .filter((entry) => entry.fsPath !== _currentSpecs.tslgenDataFolder.fsPath)
+            .map((entry) => `${_pattern}${FileSystemUtils.separator}${FileSystemUtils.baseName(entry)}`)
+            .concat(
+                (await FileSystemUtils.getFiles(_currentSpecs.tslgenRootFolder, false))
+                    .map((fileEntry) => `${_pattern}${FileSystemUtils.separator}${FileSystemUtils.baseName(fileEntry)}`)
+            );
+
         const _config = vscode.workspace.getConfiguration();
         const _filesExclude = _config.get<EditorUtils.FilesVisibility>('files.exclude') ?? {};
         const _alreadyPresentEntry = _irrelevantEntries.find((item) => _filesExclude.hasOwnProperty(item));
         const _visibility = (init) ? true : ((_alreadyPresentEntry) ? !(_filesExclude[_alreadyPresentEntry]) : true);
+
         for (const entry of _irrelevantEntries) {
             _filesExclude[entry] = _visibility;
         }
+
         _config.update("files.exclude", _filesExclude, vscode.ConfigurationTarget.Workspace);
         vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
     }
 
-    public async getDiagnostics(): Promise<vscode.Diagnostic[]> {
-        const diagnostic = new vscode.Diagnostic(
-            new vscode.Range(0, 0, 0, 10),
-            'This is a sample problem',
-            vscode.DiagnosticSeverity.Error
-          );
-        return [diagnostic];
+    public async getDiagnosticsForFile(document: vscode.Uri): Promise<vscode.Diagnostic[]> {
+        const _parsedDocuments = SerializerUtils.parseYamlDocuments(await FileSystemUtils.readFile(document));
+        if ("empty" in _parsedDocuments) {
+            return [];
+        }
+        let diagnostics: vscode.Diagnostic[] = [];
+        for (const document of _parsedDocuments) {
+            document.errors.forEach((error) => {
+                if (error.linePos) {
+                    let range: vscode.Range;
+                    if (error.linePos.length === 1) {
+                        range = new vscode.Range(error.linePos[0].line-1, error.linePos[0].col, error.linePos[0].line-1, error.linePos[0].col);
+                    } else {
+                        range = new vscode.Range(error.linePos[0].line-1, error.linePos[0].col, error.linePos[1].line-1, error.linePos[1].col);
+                    }
+                    const msg = TypeUtils.truncateFromString(error.message, /at line \d/);
+                    let diagnostic = 
+                        new vscode.Diagnostic(
+                            range,
+                            `${error.name}: ${msg}`,
+                            vscode.DiagnosticSeverity.Error,
+                        );
+                    diagnostic.source = 'yaml';
+                    diagnostic.code = error.code;
+                    diagnostics.push(diagnostic);
+                }
+             });
+             document.warnings.forEach((warning) => {
+                if (warning.linePos) {
+                    let range: vscode.Range;
+                    if (warning.linePos.length === 1) {
+                        range = new vscode.Range(warning.linePos[0].line-1, warning.linePos[0].col, warning.linePos[0].line-1, warning.linePos[0].col);
+                    } else {
+                        range = new vscode.Range(warning.linePos[0].line-1, warning.linePos[0].col, warning.linePos[1].line-1, warning.linePos[1].col);
+                    }
+                    const msg = TypeUtils.truncateFromString(warning.message, /at line \d/);
+                    let diagnostic = 
+                        new vscode.Diagnostic(
+                            range,
+                            `${warning.name}: ${msg}`,
+                            vscode.DiagnosticSeverity.Warning,
+                        );
+                    diagnostic.source = 'yaml';
+                    diagnostic.code = warning.code;
+                    diagnostics.push(diagnostic);
+                }
+             });
+        }
+        return diagnostics;
+    }
+    public async getDiagnosticsForDocument(document: vscode.TextDocument): Promise<vscode.Diagnostic[]> {
+        const _parsedDocuments = SerializerUtils.parseYamlDocuments(document.getText());
+        if ("empty" in _parsedDocuments) {
+            return [];
+        }
+        let diagnostics: vscode.Diagnostic[] = [];
+        for (const yamlDoc of _parsedDocuments) {
+            yamlDoc.errors.forEach((error) => {
+                const msg = TypeUtils.truncateFromString(error.message, /at line \d/);
+                let diagnostic = 
+                    new vscode.Diagnostic(
+                        new vscode.Range(document.positionAt(error.pos[0]), document.positionAt(error.pos[1])),
+                        `${error.name}: ${msg}`,
+                        vscode.DiagnosticSeverity.Error
+                    );
+                diagnostic.source = 'yaml';
+                diagnostic.code = error.code;
+                diagnostics.push(diagnostic);
+            });
+            yamlDoc.warnings.forEach((warning) => {
+                const msg = TypeUtils.truncateFromString(warning.message, /at line \d/);
+                let diagnostic = 
+                    new vscode.Diagnostic(
+                        new vscode.Range(document.positionAt(warning.pos[0]), document.positionAt(warning.pos[1])),
+                        `${warning.name}: ${msg}`,
+                        vscode.DiagnosticSeverity.Warning
+                    );
+                diagnostic.source = 'yaml';
+                diagnostic.code = warning.code;
+                diagnostics.push(diagnostic);
+            });
+        }
+        return diagnostics;
+    }
+
+    public async updateDiagnostics(collection: vscode.DiagnosticCollection, document?: vscode.TextDocument): Promise<void> {
+        if (!document) {
+            const _currentTSLRoot = TSLGeneratorModel.getTSLRootFolderForCurrentActiveFile();
+            if (!_currentTSLRoot) {
+                return;
+            }
+            if ((_currentTSLRoot.fsPath in this.openedTSLGenerators)) {
+                (await FileSystemUtils.getFiles(this.openedTSLGenerators[_currentTSLRoot.fsPath].tslgenDataFolder, true, TSLGeneratorModel.tslGenDataFileExtension)).map(async (uri) => {
+                    collection.delete(uri);
+                    collection.set(uri, await this.getDiagnosticsForFile(uri));
+                });
+                
+            }
+        } else {
+            const _currentTSLRoot = TSLGeneratorModel.getTSLRootFolder(document.uri);
+            if (!_currentTSLRoot) {
+                return;
+            }
+            collection.delete(document.uri);
+            collection.set(document.uri, await this.getDiagnosticsForDocument(document));
+        }
+        await vscode.commands.executeCommand('vscode.executeDiagnostics', collection);
+        
     }
 }
 export const tslEditorExtension = TSLEditorExtension.getInstance();

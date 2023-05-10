@@ -11,6 +11,7 @@ export namespace SerializerUtils {
         return yaml.parseAllDocuments(yamlString, {
             merge: true,
             lineCounter: new yaml.LineCounter()
+            // prettyErrors: false
         });
     }
     export async function dumpYamlDocuments(docs: yaml.Document.Parsed<yaml.ParsedNode>[]): Promise<string> {

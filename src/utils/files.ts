@@ -141,12 +141,25 @@ export namespace FileSystemUtils {
             return _dirs;
         }
     }
-    export async function getFiles(startUri: vscode.Uri | string, recursive: boolean = false): Promise<vscode.Uri[]> {
+    export async function getFiles(startUri: vscode.Uri | string, recursive: boolean = false, fileExtension?: string): Promise<vscode.Uri[]> {
         const _uri = toUri(startUri);
         const _directoryPath: string = _uri.fsPath;
         const _entries = await fs.promises.readdir(_directoryPath, { withFileTypes: true });
         const _dirs = _entries.filter(entry => entry.isDirectory()).map(entry => _uri.with({ path: path.join(_uri.fsPath, entry.name) }));
-        const _files = _entries.filter(entry => entry.isFile()).map(entry => _uri.with({ path: path.join(_uri.fsPath, entry.name) }));
+        let _files: vscode.Uri[] = [];
+        if (fileExtension) {
+            let _fileExtension: string = fileExtension;
+            if (fileExtension.length > 0) {
+                if (!(fileExtension.startsWith("."))) {
+                    _fileExtension = `.${fileExtension}`;
+                }
+            }
+            _files = _entries.filter(entry => entry.isFile())
+                .filter((entry) => path.extname(entry.name) === _fileExtension)
+                .map(entry => _uri.with({ path: path.join(_uri.fsPath, entry.name) }));
+        } else {
+            _files = _entries.filter(entry => entry.isFile()).map(entry => _uri.with({ path: path.join(_uri.fsPath, entry.name) }));
+        }
         if (recursive) {
             const _subFilesPromises = _dirs.map(dir => getFiles(dir, true));
             const _subDirsFiles = await Promise.all(_subFilesPromises);

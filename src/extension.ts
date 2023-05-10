@@ -9,7 +9,7 @@ import * as fs from 'fs';
 // let tslPreviewPanel: vscode.WebviewPanel | undefined;
 
 let tslTerminal: vscode.Terminal | undefined;
-
+let tslgenDiagnosticCollection : vscode.DiagnosticCollection = vscode.languages.createDiagnosticCollection('TSLGen');
 
 export async function activate(context: vscode.ExtensionContext) {
     tslEditorExtension.update();
@@ -92,6 +92,15 @@ export async function activate(context: vscode.ExtensionContext) {
             tslTerminal = undefined;
         }
     });
+
+    vscode.workspace.onDidChangeTextDocument(async (event) => {
+        await tslEditorExtension.updateDiagnostics(tslgenDiagnosticCollection, event.document);
+    });
+
+    vscode.workspace.onDidOpenTextDocument(async (event) => {
+        await tslEditorExtension.updateDiagnostics(tslgenDiagnosticCollection, event);
+    });
+
     // context.subscriptions.push(vscode.languages.registerContextMenuProvider)
     // vscode.commands.executeCommand('workbench.view.explorer');
 }
