@@ -254,14 +254,14 @@ export class TSLEditorExtension {
             return;
         }
         const _preFormattedText = await SerializerUtils.dumpYamlDocuments(_parsedDocuments);
-        const regex = new RegExp('^(?<indent>\\s*)-[^-]\\s*(?<value>.+)$', 'gm');
-        const _formattedText = _preFormattedText.replaceAll(regex, `$<indent>-\n$<indent>  $<value>`);
+        // const regex = new RegExp('^(?<indent>\\s*)-[^-]\\s*(?<value>.+)$', 'gm');
+        // const _formattedText = _preFormattedText.replaceAll(regex, `$<indent>-\n$<indent>  $<value>`);
         await _editor.edit((editBuilder) => {
             // Replace the entire text of the document with the new content
             const document = _editor.document;
             const lastLine = document.lineAt(document.lineCount - 1);
             const range = new vscode.Range(0, 0, lastLine.range.end.line, lastLine.range.end.character);
-            editBuilder.replace(range, _formattedText);
+            editBuilder.replace(range, _preFormattedText);
         });
         await vscode.commands.executeCommand('vscode.executeDocumentSymbolProvider', _document.uri);
     }
@@ -484,6 +484,15 @@ export class TSLEditorExtension {
         }
         _config.update("files.exclude", _filesExclude, vscode.ConfigurationTarget.Workspace);
         vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
+    }
+
+    public async getDiagnostics(): Promise<vscode.Diagnostic[]> {
+        const diagnostic = new vscode.Diagnostic(
+            new vscode.Range(0, 0, 0, 10),
+            'This is a sample problem',
+            vscode.DiagnosticSeverity.Error
+          );
+        return [diagnostic];
     }
 }
 export const tslEditorExtension = TSLEditorExtension.getInstance();

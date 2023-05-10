@@ -156,8 +156,11 @@ export namespace FileSystemUtils {
         }
     }
 
-    export async function getFileStats(uri: vscode.Uri | string): Promise<fs.Stats> {
+    export async function getFileStats(uri: vscode.Uri | string): Promise<fs.Stats | undefined> {
         const _uri = toUri(uri);
+        if (!await fileExists(_uri)) {
+            return undefined;
+        }
         return fs.promises.stat(_uri.fsPath);
     }
     export async function iterFiles(startUri: vscode.Uri | string, fileExtension: string | undefined = undefined): Promise<MutableFile[]> {
