@@ -3,6 +3,58 @@ import * as path from 'path';
 import * as fs from 'fs';
 
 export namespace FileSystemUtils {
+
+    enum FileHandleType {
+        document,
+        text,
+        unspecified
+    }
+    export class FileHandle {
+        private uri?: vscode.Uri;
+        private text?: string;
+        private document?: vscode.TextDocument;
+        private type: FileHandleType = FileHandleType.unspecified;
+
+        public setDocument(document: vscode.TextDocument): void {
+            if (this.type === FileHandleType.unspecified) {
+                this.document = document;
+                this.type = FileHandleType.document;
+            }
+        }
+        public setContent(uri: vscode.Uri, text: string): void {
+            if (this.type === FileHandleType.unspecified) {
+                this.uri = uri;
+                this.text = text;
+                this.type = FileHandleType.text;
+            }
+        }
+        public getUri(): vscode.Uri {
+            if (this.type === FileHandleType.document) {
+                return this.document?.uri ?? vscode.Uri.parse('');
+            } else {
+                return this.uri ?? vscode.Uri.parse('');
+            }
+        }
+        public getText(): string {
+            if (this.type === FileHandleType.document) {
+                return this.document?.getText() ?? '';
+            } else {
+                return this.text ?? '';
+            }
+        }
+        public getRange(start: number, end: number): vscode.Range {
+            if (this.type === FileHandleType.document) {
+                if  (!this.document) {
+                    return new vscode.Range(0, 0, 0, 0);
+                }
+                return new vscode.Range(this.document.positionAt(start), this.document.positionAt(end));
+            } else {
+                return numberToRange(this.getText(), start, end);
+            }
+        }
+
+    }
+
     export const separator = path.sep;
     export function toUri(uri: vscode.Uri | string): vscode.Uri {
         return (typeof uri === "string") ? vscode.Uri.parse(uri) : uri;
@@ -98,6 +150,19 @@ export namespace FileSystemUtils {
         const _fname = `${filename(_uri, false)}${_extension}`;
         return addPathToUri(toUri(path.dirname(_uri.fsPath)), _fname);
     }
+    export function getFileExtension(filename: vscode.Uri | string): string {
+        const _uri = toUri(filename).path;
+        // Find the last occurrence of the dot (.)
+        const dotIndex = _uri.lastIndexOf('.');
+      
+        // Check if a dot exists and it is not the last character
+        if (dotIndex !== -1 && dotIndex < _uri.length - 1) {
+          // Extract the substring after the dot
+          const extension = _uri.substring(dotIndex);
+          return extension;
+        }
+        return '';
+      }
     export function filenameWithExtension(uri: vscode.Uri | string, extension: string): string {
         const _uri = toUri(uri);
         const _extension = (extension.startsWith('.')) ? extension : `.${extension}`;
@@ -141,12 +206,25 @@ export namespace FileSystemUtils {
             return _dirs;
         }
     }
-    export async function getFiles(startUri: vscode.Uri | string, recursive: boolean = false): Promise<vscode.Uri[]> {
+    export async function getFiles(startUri: vscode.Uri | string, recursive: boolean = false, fileExtension?: string): Promise<vscode.Uri[]> {
         const _uri = toUri(startUri);
         const _directoryPath: string = _uri.fsPath;
         const _entries = await fs.promises.readdir(_directoryPath, { withFileTypes: true });
         const _dirs = _entries.filter(entry => entry.isDirectory()).map(entry => _uri.with({ path: path.join(_uri.fsPath, entry.name) }));
-        const _files = _entries.filter(entry => entry.isFile()).map(entry => _uri.with({ path: path.join(_uri.fsPath, entry.name) }));
+        let _files: vscode.Uri[] = [];
+        if (fileExtension) {
+            let _fileExtension: string = fileExtension;
+            if (fileExtension.length > 0) {
+                if (!(fileExtension.startsWith("."))) {
+                    _fileExtension = `.${fileExtension}`;
+                }
+            }
+            _files = _entries.filter(entry => entry.isFile())
+                .filter((entry) => path.extname(entry.name) === _fileExtension)
+                .map(entry => _uri.with({ path: path.join(_uri.fsPath, entry.name) }));
+        } else {
+            _files = _entries.filter(entry => entry.isFile()).map(entry => _uri.with({ path: path.join(_uri.fsPath, entry.name) }));
+        }
         if (recursive) {
             const _subFilesPromises = _dirs.map(dir => getFiles(dir, true));
             const _subDirsFiles = await Promise.all(_subFilesPromises);
@@ -266,6 +344,48 @@ export namespace FileSystemUtils {
     export function joinPath(...files: string[]): string {
         return path.join(...files);
     }
+
+    function * lineIterator(text: string): Generator<string> {
+        const lineRegExp = /.*?(?:\r\n|\r|\n|$)/g;
+        let match: RegExpExecArray | null;
+        while ((match = lineRegExp.exec(text))) {
+          const line = match[0];
+          yield line.trim(); // Trim the line if needed
+        }
+    }
     
+    
+
+    export function numberToRange(str: string, start: number, end: number): vscode.Range {
+        function regexIndexOf(str: string, regex: RegExp, startpos: number) {
+            var indexOf = str.substring(startpos).search(regex);
+            return (indexOf >= 0) ? (indexOf +1 + startpos) : indexOf;
+        }
+        const lineRegExp = /(?:\r\n|\r|\n|$)/g;
+        let indexOfNewline: number;
+        let previousIndex = 0;
+        let currentIndex = 0;
+        let lineCount = 0;
+
+        while ((indexOfNewline = regexIndexOf(str, lineRegExp, currentIndex)) >= 0) {
+            lineCount++;
+            currentIndex = indexOfNewline;
+            if (currentIndex >= start) {
+                break;
+            }
+            previousIndex = currentIndex;
+        }        
+        const rangeStartLine = lineCount;
+        const rangeStartCol = start - previousIndex;
+        while (currentIndex < end && (indexOfNewline = regexIndexOf(str, lineRegExp, currentIndex)) >= 0) {
+            lineCount++;
+            currentIndex += indexOfNewline;
+            if (currentIndex >= end) {
+                break;
+            }
+            previousIndex = currentIndex;
+        }
+        return new vscode.Range(rangeStartLine, rangeStartCol, lineCount, end - previousIndex);
+    }
 
 }

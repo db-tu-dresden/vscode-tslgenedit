@@ -5,10 +5,13 @@ import { TSLEditorAutoComplete } from './editor/autocomplete';
 import { YAMLProcessingMode } from './editor/enums';
 import { TSLGenDaemon } from './tslgen/liveBuild';
 
+let tslgenDiagnosticCollection : vscode.DiagnosticCollection;
+
 export async function activate(context: vscode.ExtensionContext) {
     TSLGenDaemon.startTslGenDaemon();
 
     tslEditorExtension.update();
+    tslgenDiagnosticCollection = vscode.languages.createDiagnosticCollection('TSLGen');
 
     const provider = new TSLEditorPreview.TSLGenViewProvider(context.extensionUri, context);
 
@@ -77,6 +80,16 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.window.onDidCloseTerminal((terminal) => {
         TSLGenDaemon.checkTerminalState( terminal );
     });
+
+    vscode.workspace.onDidChangeTextDocument(async (event) => {
+        await tslEditorExtension.updateDiagnostics(tslgenDiagnosticCollection, event.document);
+    });
+
+    vscode.workspace.onDidOpenTextDocument(async (event) => {
+        await tslEditorExtension.updateDiagnostics(tslgenDiagnosticCollection, event);
+    });
+    
+    await tslEditorExtension.updateDiagnosticsForAll(tslgenDiagnosticCollection);
     // context.subscriptions.push(vscode.languages.registerContextMenuProvider)
     // vscode.commands.executeCommand('workbench.view.explorer');
 }

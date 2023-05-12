@@ -3,6 +3,8 @@ import { TextDocument, Position } from 'vscode';
 
 export namespace SerializerUtils {
     export type YamlDocument = yaml.Document.Parsed<yaml.ParsedNode>;
+    export type YamlNode = yaml.ParsedNode;
+    export type YamlDiagnosticType = yaml.YAMLWarning | yaml.YAMLError;
     export interface JSONNode {
         [key: string]: any;
     }
@@ -11,8 +13,78 @@ export namespace SerializerUtils {
         return yaml.parseAllDocuments(yamlString, {
             merge: true,
             lineCounter: new yaml.LineCounter()
+            // prettyErrors: false
         });
     }
+
+    export enum YamlDiagnosticCustomType {
+        error = "YAMLSchemaError",
+        hint = "YAMLSchemaHint"
+    }
+
+    export enum YamlFieldConstraint {
+        required = "required",
+        optional = "optional",
+        recommended = "recommended",
+        composed = "composed"
+    }
+
+    export interface YamlField {
+        constraint: YamlFieldConstraint,
+        type: string,
+        default?: any
+    }
+    export interface YamlDiagnostic {
+        type: YamlDiagnosticCustomType;
+        code: string;
+        message: string;
+        node: YamlNode;
+    }
+    
+
+    export function getEntryType(schema: any) {
+        if (typeof schema === 'object') {
+            const _constraint =
+                schema.hasOwnProperty('minValue')
+                    ? schema['minValue'] === 0
+                        ? schema.hasOwnProperty('recommended') && schema['recommended'] === true
+                            ? YamlFieldConstraint.recommended
+                            : YamlFieldConstraint.optional
+                        : YamlFieldConstraint.required
+                    : YamlFieldConstraint.composed;
+            const _type = schema.hasOwnProperty('type') ? schema['type'] : 'object';
+            const _default = schema.hasOwnProperty('default') ? schema['default'] : undefined;
+            return { constraint: _constraint, type: _type, default: _default };
+        }
+        return undefined;
+    }
+    export function *validateYamlDocument(yamlDocument: YamlDocument | YamlNode, schema: any): Generator<YamlDiagnostic> {
+        if ((yamlDocument instanceof yaml.YAMLMap)) {
+            const _yamlDocument = yamlDocument as yaml.YAMLMap;
+            for (const [key, value] of Object.entries(schema)) {
+                if (!(_yamlDocument.has(key))) {
+                    if (((value as any).hasOwnProperty("minValue")) && ((value as any)["minValue"] === 1)) {
+                        yield { type: YamlDiagnosticCustomType.error, code: 'KEY_ERROR', message: `Missing required field ${key}`, node: yamlDocument as YamlNode};
+                    } else if (((value as any).hasOwnProperty("minValue")) && ((value as any)["minValue"] === 0) && ((value as any).hasOwnProperty("recommended")) && ((value as any)["recommended"] === true)) {
+                        yield { type: YamlDiagnosticCustomType.hint, code: 'KEY_WARNING', message: `Missing recommended field ${key}`, node: yamlDocument as YamlNode};
+                    }
+                } else {
+                    if (((value as any).hasOwnProperty("minValue")) && ((value as any)["minValue"] === 0) && ((value as any).hasOwnProperty("recommended")) && ((value as any)["recommended"] === true) && ((value as any).hasOwnProperty("default") && ((value as any)["default"] === _yamlDocument.get(key)))) {
+                        yield { type: YamlDiagnosticCustomType.hint, code: 'VALUE_WARNING', message: `Recommended field ${key} is set to default value`, node: yamlDocument as YamlNode};
+                    }
+                    if ((value as any).hasOwnProperty("items")) {
+                        yield * validateYamlDocument(_yamlDocument.get(key) as YamlNode, (value as any)["items"] as any);
+                    }
+                }
+            }
+        } else if ((yamlDocument instanceof yaml.YAMLSeq)) {
+            const _yamlDocument = yamlDocument as yaml.YAMLSeq;
+            for (const item of _yamlDocument.items) {
+                yield * validateYamlDocument(item as YamlNode, schema);
+            }
+        }
+    }
+
     export async function dumpYamlDocuments(docs: yaml.Document.Parsed<yaml.ParsedNode>[]): Promise<string> {
         const resultPromises = docs.map(async (doc) => {
             let result: string = "";
