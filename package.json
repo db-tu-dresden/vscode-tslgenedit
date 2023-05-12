@@ -64,12 +64,22 @@
         "category": "TSL-Generator"
       },
       {
-        "command": "tslgen-edit.send_text_to_dummy",
+        "command": "tslgen-edit.start-tsl-daemon",
+        "title": "Start the TSL Generator as a daemon",
+        "category": "TSL-Generator"
+      },
+      {
+        "command": "tslgen-edit.buildAndTest",
+        "title": "Build and Test the current selection",
+        "category": "TSL-Generator"
+      },
+      {
+        "command": "tslgen-edit.generate-with-daemon",
         "title": "Send some text to a dummy child process",
         "category": "TSL-Generator"
       },
       {
-        "command": "tslgen-edit.close_dummy",
+        "command": "tslgen-edit.close_daemon",
         "title": "Close the dummy connection",
         "category": "TSL-Generator"
       }
