@@ -1,17 +1,13 @@
 import * as vscode from 'vscode';
-import { TSLGeneratorModel } from './tslgen/model';
 import { TSLEditorPreview } from './editor/preview';
 import { tslEditorExtension } from './editor/editor_extension';
 import { TSLEditorAutoComplete } from './editor/autocomplete';
 import { YAMLProcessingMode } from './editor/enums';
-import * as fs from 'fs';
-
-// let tslPreviewPanel: vscode.WebviewPanel | undefined;
-
-let tslTerminal: vscode.Terminal | undefined;
-
+import { TSLGenDaemon } from './tslgen/liveBuild';
 
 export async function activate(context: vscode.ExtensionContext) {
+    TSLGenDaemon.startTslGenDaemon();
+
     tslEditorExtension.update();
 
     const provider = new TSLEditorPreview.TSLGenViewProvider(context.extensionUri, context);
@@ -59,45 +55,32 @@ export async function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(vscode.commands.registerCommand('tslgen-edit.sort', async () => {
         await tslEditorExtension.sortFile();
     }));
-
-    const TSL_TERMINAL_IDENT = "TSL Terminal";
+   
     context.subscriptions.push(vscode.commands.registerCommand('tslgen-edit.buildAndTest', async () => {
         const _data = await tslEditorExtension.renderCurrentSelection(YAMLProcessingMode.BuildRunAndTest) as TSLEditorPreview.PreviewMetaData;
         if (_data.buildable) {
-            const tslPwd = TSLGeneratorModel.getTSLRootFolderForCurrentActiveFile();
-            const tslTempBuildDir = `tslgenEdit-build`;
-            const tslTempDir = `${tslPwd?.fsPath}/${tslTempBuildDir}`;
-            if (!tslTerminal) {
-                tslTerminal = vscode.window.createTerminal(`TSL Terminal`);
-            }
-            /* Cleanse the temp build dir. even Cmake clean should not be aware of everything the generator did. */
-            if (fs.existsSync(tslTempDir)) {
-                fs.rmdirSync(tslTempDir, { recursive: true });
-            }
-            fs.mkdirSync(tslTempDir);
-
-            tslTerminal.show();
-            tslTerminal.sendText(`cd ${tslPwd?.fsPath}`);
-            tslTerminal.sendText(`cmake -S . -B ${tslTempDir} -UTSL_LSCPU_FLAGS -DTSL_FILTER_FOR_PRIMITIVES="${_data.primitive_name}"`);
-            tslTerminal.sendText(`make -C ${tslTempDir}`);
-            tslTerminal.sendText(`${tslTempDir}/${tslTempBuildDir}/generator_output/src/test/tsl_test \"[${_data.extension_name}][${_data.primitive_name}]\"`);
+            await TSLGenDaemon.generateWithDaemon( _data );
         } else {
             vscode.window.showErrorMessage(`No buildable primitive selected.`);
         }
     }));
 
+    context.subscriptions.push(vscode.commands.registerCommand('tslgen-edit.start-tsl-daemon', async () => {
+        TSLGenDaemon.startTslGenDaemon();
+    }));
+
+    context.subscriptions.push(vscode.commands.registerCommand('tslgen-edit.close_daemon', async () => {
+        TSLGenDaemon.killDaemon();
+    }));
+
+
     vscode.window.onDidCloseTerminal((terminal) => {
-        if (terminal.name === TSL_TERMINAL_IDENT) {
-            tslTerminal?.dispose();
-            tslTerminal = undefined;
-        }
+        TSLGenDaemon.checkTerminalState( terminal );
     });
     // context.subscriptions.push(vscode.languages.registerContextMenuProvider)
     // vscode.commands.executeCommand('workbench.view.explorer');
 }
 
 export function deactivate() {
-    if (tslTerminal) {
-        tslTerminal.dispose();
-    }
+    TSLGenDaemon.tearDown();
 }
