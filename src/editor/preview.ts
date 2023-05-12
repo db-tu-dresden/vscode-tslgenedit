@@ -217,7 +217,7 @@ export namespace TSLEditorPreview {
 
     export async function renderSelection(
         tslSpecs: TSLGeneratorModel.TSLGeneratorSpecs,
-        defaults: TSLEditorTransformation.DefaultsFromSchema,
+        supplementaryData: TSLEditorTransformation.SchemaSupplementary,
         currentDocument: vscode.TextDocument,
         documents: SerializerUtils.YamlDocument[],
         cursorPosition: vscode.Position,
@@ -248,7 +248,7 @@ export namespace TSLEditorPreview {
                         staticContent: await templateManager.render(
                             tslSpecs.tslgenTemplateRootFolder,
                             `@core/extension${TSLEditorTransformation.templateFileExtension}`,
-                            TypeUtils.extendObjects(_data.toJSON(), defaults.extension)),
+                            TypeUtils.extendObjects(_data.toJSON(), supplementaryData.extension.defaults)),
                         tslType: TSLDataType.extension
                     };
                 case YAMLProcessingMode.BuildRunAndTest:
@@ -293,7 +293,7 @@ export namespace TSLEditorPreview {
                             staticContent: await templateManager.render(
                                 tslSpecs.tslgenTemplateRootFolder,
                                 `@core/primitive_declaration${TSLEditorTransformation.templateFileExtension}`,
-                                TypeUtils.extendObjects(_declarationJson, defaults.primitiveDeclaration)
+                                TypeUtils.extendObjects(_declarationJson, supplementaryData.primitive.declarationDefaults)
                             ),
                             tslType: TSLDataType.primitiveDeclaration
                         };
@@ -335,13 +335,13 @@ export namespace TSLEditorPreview {
                 const _extensionDataJson = ((_extensionData) && (yaml.isDocument(_extensionData))) ? _extensionData.toJSON() : {};
 
                 const _declarationAndExtensionDataJson = TypeUtils.extendObjects(
-                    TypeUtils.extendObjects(_extensionDataJson, defaults.extension),
-                    TypeUtils.extendObjects(_declarationJson, defaults.primitiveDeclaration)
+                    TypeUtils.extendObjects(_extensionDataJson, supplementaryData.extension.defaults),
+                    TypeUtils.extendObjects(_declarationJson, supplementaryData.primitive.declarationDefaults)
                 );
 
                 const _ctypeArray = (yaml.isCollection(_ctypes)) ? _ctypes.items.map((element) => `${element}`) : [`${_ctypes}`];
                 const _mergedDataJson = TypeUtils.extendObjects(
-                    TypeUtils.extendObjects(_definition.toJSON(), defaults.primitiveDefinition),
+                    TypeUtils.extendObjects(_definition.toJSON(), supplementaryData.primitive.definitionDefaults),
                     _declarationAndExtensionDataJson
                 );
 
@@ -499,6 +499,7 @@ export namespace TSLEditorPreview {
         }
 
         private indentCPP(cppCode: string): string {
+            cppCode = cppCode.replace(/</g, "&lt;").replace(/>/g, "&gt;"); // escape < and > before indenting
             const minIndent = "  ";
             const lines = cppCode.split("\n");
             let formatted: string;

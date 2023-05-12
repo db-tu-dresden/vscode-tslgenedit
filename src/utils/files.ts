@@ -98,6 +98,19 @@ export namespace FileSystemUtils {
         const _fname = `${filename(_uri, false)}${_extension}`;
         return addPathToUri(toUri(path.dirname(_uri.fsPath)), _fname);
     }
+    export function getFileExtension(filename: vscode.Uri | string): string {
+        const _uri = toUri(filename).path;
+        // Find the last occurrence of the dot (.)
+        const dotIndex = _uri.lastIndexOf('.');
+      
+        // Check if a dot exists and it is not the last character
+        if (dotIndex !== -1 && dotIndex < _uri.length - 1) {
+          // Extract the substring after the dot
+          const extension = _uri.substring(dotIndex);
+          return extension;
+        }
+        return '';
+      }
     export function filenameWithExtension(uri: vscode.Uri | string, extension: string): string {
         const _uri = toUri(uri);
         const _extension = (extension.startsWith('.')) ? extension : `.${extension}`;

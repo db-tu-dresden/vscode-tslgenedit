@@ -8,15 +8,29 @@ import { TSLEditorPreview } from './preview';
 import { TSLEditorFileSymbols } from './symbols';
 import { TSLGeneratorSchema } from '../tslgen/schema';
 import { YAMLProcessingMode } from './enums';
-import { TypeUtils } from '../utils/types';
+import { TSLEditorFileDiagnostics } from './diagnostics';
+import { ThreadSafeDictionary } from '../utils/thread_structs';
 
+enum ExtensionParsedState {
+    processing = 1,
+    initialized = 2
+};
 export class TSLEditorExtension {
+    
     private static instance: TSLEditorExtension;
-    private openedTSLGenerators: { [key: string]: TSLGeneratorModel.TSLGeneratorSpecs } = {};
+    private tslGeneratorsState: ThreadSafeDictionary<string, ExtensionParsedState> = new ThreadSafeDictionary<string, ExtensionParsedState>();
+    private openedTSLGenerators: 
+        { [key: string]: {
+            specs: TSLGeneratorModel.TSLGeneratorSpecs,
+            schemaData: {
+                schema: TSLGeneratorSchema.Schemata,
+                supplementary: TSLEditorTransformation.SchemaSupplementary
+            }
+            
+        }} = {};
     private templateManager: TSLEditorPreview.TemplateManager = TSLEditorPreview.templateManager;
     private fsWatchers: vscode.FileSystemWatcher[] = [];
-    private schemaLocations: { [key: string]: TSLGeneratorSchema.SchemaFileLocations } = {};
-    private schemata: { [key: string]: TSLGeneratorSchema.Schemata } = {};
+    
     private constructor() {
         this.getCurrentTSLRoot = this.getCurrentTSLRoot.bind(this);
     }
@@ -27,7 +41,7 @@ export class TSLEditorExtension {
         return TSLEditorExtension.instance;
     }
 
-    private async getCurrentTSLRoot(silent: boolean = false): Promise<vscode.Uri | undefined> {
+    private async getCurrentTSLRoot(silent: boolean = true): Promise<vscode.Uri | undefined> {
         const _currentTSLRoot = TSLGeneratorModel.getTSLRootFolderForCurrentActiveFile();
         if (!_currentTSLRoot) {
             return undefined;
@@ -59,11 +73,43 @@ export class TSLEditorExtension {
         return _currentTSLRoot;
     }
 
+    private async getTSLRoot(_currentFileUri: vscode.Uri, silent: boolean = true) {
+        const _rootFolder = TSLGeneratorModel.getTSLRootFolder(_currentFileUri);
+        if (!_rootFolder) {
+            return undefined;
+        }
+        if (!(_rootFolder.fsPath in this.openedTSLGenerators)) {
+            if (silent) {
+                await this.update(_currentFileUri);
+                if (!(_rootFolder.fsPath in this.openedTSLGenerators)) {
+                    vscode.window.showErrorMessage(`${_rootFolder.fsPath} could not be parsed.`);
+                    return undefined;
+                }
+            } else {
+                const selected = await vscode.window.showErrorMessage(`${_rootFolder.fsPath} was not parsed yet.`, "Initialize", "Ignore");
+                if (selected) {
+                    if (selected === 'Initialize') {
+                        await this.update(_currentFileUri);
+                        if (!(_rootFolder.fsPath in this.openedTSLGenerators)) {
+                            vscode.window.showErrorMessage(`${_rootFolder.fsPath} could not be parsed.`);
+                            return undefined;
+                        }
+                    } else {
+                        return undefined;
+                    }
+                } else {
+                    return undefined;
+                }
+            }
+        }
+        return _rootFolder;
+    }
+
     public getSchema(_currentFileUri: vscode.Uri): TSLGeneratorSchema.Schemata | undefined {
         const _rootFolder = TSLGeneratorModel.getTSLRootFolder(_currentFileUri);
         if (_rootFolder) {
-            if (_rootFolder.fsPath in this.schemata) {
-                return this.schemata[_rootFolder.fsPath];
+            if (_rootFolder.fsPath in this.openedTSLGenerators) {
+                return this.openedTSLGenerators[_rootFolder.fsPath].schemaData.schema;
             }
         }
         return undefined;
@@ -81,7 +127,7 @@ export class TSLEditorExtension {
                 const createSuccess = await FileSystemUtils.createDir(templateFolder);
                 if (!createSuccess) {
                     vscode.window.showErrorMessage(`Could not create Directory ${templateFolder.fsPath}.`);
-                    return false;
+                    return undefined;
                 }
             }
             const templateTransformationTargets: TSLEditorTransformation.TransformationTarget[] = specs.tslgenTemplateFiles.map((templateFile) => {
@@ -94,7 +140,7 @@ export class TSLEditorExtension {
             const templateTransformationSuccess = await TSLEditorTransformation.transformTemplates(templateTransformationTargets);
             if (!templateTransformationSuccess) {
                 vscode.window.showErrorMessage("Could not transform templates.");
-                return false;
+                return undefined;
             }
             this.templateManager.addTemplateDirectories(_twigTemplateFolders, specs.tslgenTemplateRootFolder);
 
@@ -105,46 +151,69 @@ export class TSLEditorExtension {
             }, false);
             if (!_schemata) {
                 vscode.window.showErrorMessage("Could not transform schame.");
-                return false;
+                return undefined;
             }
-
-            this.schemata[specs.tslgenRootFolder.fsPath] = _schemata as TSLGeneratorSchema.Schemata;
             // this.schemaLocations[specs.tslgenRootFolder.fsPath] = _schemaTransformationLocation;
-            return true;
+            return {
+                schema: _schemata as TSLGeneratorSchema.Schemata,
+                supplementary: await TSLEditorTransformation.getSupplementaryFromYamlSchema(_schemata)
+            };
         };
         return await vscode.window.withProgress(progressOptions, progressCallback);
     }
 
-    public async update(): Promise<boolean> {
-        const _currentSpecs = await TSLGeneratorModel.getTSLGeneratorModelForCurrentActiveFile();
+    public async update(uri?: vscode.Uri): Promise<boolean> {
+        const _currentSpecs = (uri) ? await TSLGeneratorModel.getTSLGeneratorModelForFile(uri) : await TSLGeneratorModel.getTSLGeneratorModelForCurrentActiveFile();
         if (_currentSpecs) {
-            if (!(_currentSpecs.tslgenRootFolder.fsPath in this.openedTSLGenerators)) {
+            const tslProcessingState = await this.tslGeneratorsState.tryInsert(_currentSpecs.tslgenRootFolder.fsPath, ExtensionParsedState.processing);
+            if (!tslProcessingState) {
+                let result;
+                while (( result = await this.tslGeneratorsState.get(_currentSpecs.tslgenRootFolder.fsPath))) {
+                    if ( result === ExtensionParsedState.processing) {
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                    } else {
+                        return true;
+                    }
+                } 
+                //Another thread tried to initialize the same directory but failed... so consequently we don't have to try it again since nothing changed
+                return false;
+            } else {
                 const progressOptions = { location: vscode.ProgressLocation.Notification, title: `Indexing TSLGenerator Directory ${_currentSpecs.tslgenRootFolder.fsPath}...` };
                 const progressCallback = async (progress: vscode.Progress<{ message?: string; }>) => {
-                    this.openedTSLGenerators[_currentSpecs.tslgenRootFolder.fsPath] = _currentSpecs;
-                    const initSuccess = await this.init(_currentSpecs);
-                    if (!initSuccess) {
+                    const _schemaData = await this.init(_currentSpecs);
+                    if (!_schemaData) {
                         vscode.window.showErrorMessage(`Could not initialize TSLEditorExtension for ${_currentSpecs.tslgenRootFolder.fsPath}`);
+                        await this.tslGeneratorsState.remove(_currentSpecs.tslgenRootFolder.fsPath);
                         return false;
                     }
+                    this.openedTSLGenerators[_currentSpecs.tslgenRootFolder.fsPath] = { specs: _currentSpecs, schemaData: { schema: _schemaData.schema, supplementary: _schemaData.supplementary } };
+                    
                     progress.report({ message: `Creating FileSystemWatchers for ${_currentSpecs.tslgenDataSchemaFile.fsPath}` });
                     const _schemaWatcher = vscode.workspace.createFileSystemWatcher(_currentSpecs.tslgenDataSchemaFile.fsPath);
                     _schemaWatcher.onDidCreate(async (uri) => {
                         console.log(`Transform schema: ${uri} --> ${_currentSpecs.tslgenPrimitiveDataFolder}`);
-                        const transformResult = await TSLEditorTransformation.transformSchema({ sourceFile: uri, targetFolder: _currentSpecs.tslgenDataFolder });
+                        const transformResult = await TSLEditorTransformation.transformSchema({ sourceFile: uri, targetFolder: _currentSpecs.tslgenDataFolder }, false);
                         if (!transformResult) {
                             vscode.window.showErrorMessage(`Could not transform schema ${uri.fsPath}.`);
                         } else {
-                            this.schemata[_currentSpecs.tslgenRootFolder.fsPath] = transformResult as TSLGeneratorSchema.Schemata;
+                            const _schema = transformResult as TSLGeneratorSchema.Schemata;
+                            this.openedTSLGenerators[_currentSpecs.tslgenRootFolder.fsPath].schemaData = {
+                                schema: _schema,
+                                supplementary: await TSLEditorTransformation.getSupplementaryFromYamlSchema(_schema)
+                            };
                         }
                     });
                     _schemaWatcher.onDidChange(async (uri) => {
                         console.log(`Transform schema: ${uri} --> ${_currentSpecs.tslgenPrimitiveDataFolder}`);
-                        const transformResult = await TSLEditorTransformation.transformSchema({ sourceFile: uri, targetFolder: _currentSpecs.tslgenDataFolder });
+                        const transformResult = await TSLEditorTransformation.transformSchema({ sourceFile: uri, targetFolder: _currentSpecs.tslgenDataFolder }, false);
                         if (!transformResult) {
                             vscode.window.showErrorMessage(`Could not transform schema ${uri.fsPath}.`);
                         } else {
-                            this.schemata[_currentSpecs.tslgenRootFolder.fsPath] = transformResult as TSLGeneratorSchema.Schemata;
+                            const _schema = transformResult as TSLGeneratorSchema.Schemata;
+                            this.openedTSLGenerators[_currentSpecs.tslgenRootFolder.fsPath].schemaData = {
+                                schema: _schema,
+                                supplementary: await TSLEditorTransformation.getSupplementaryFromYamlSchema(_schema)
+                            };
                         }
                     });
                     this.fsWatchers.push(_schemaWatcher);
@@ -192,11 +261,10 @@ export class TSLEditorExtension {
                         });
                         this.fsWatchers.push(_templateWatcher);
                     }
+                    await this.tslGeneratorsState.set(_currentSpecs.tslgenRootFolder.fsPath, ExtensionParsedState.initialized);
                     return true;
                 };
                 return await vscode.window.withProgress(progressOptions, progressCallback);
-            } else {
-                return true;
             }
         } else {
             return true;
@@ -309,9 +377,10 @@ export class TSLEditorExtension {
                     return TSLEditorPreview.emptyPreviewMetaData();
             }
         }
-        const _tslGenSpecs: TSLGeneratorModel.TSLGeneratorSpecs = this.openedTSLGenerators[_currentTSLRoot.fsPath];
-        const _defaults = await TSLEditorTransformation.getDefaultsFromYamlSchema(_tslGenSpecs.tslgenDataSchemaFile);
-        if (!_defaults) {
+        
+        const _tslGenSpecs: TSLGeneratorModel.TSLGeneratorSpecs = this.openedTSLGenerators[_currentTSLRoot.fsPath].specs;
+        const _supplementary: TSLEditorTransformation.SchemaSupplementary = this.openedTSLGenerators[_currentTSLRoot.fsPath].schemaData.supplementary;
+        if (!_supplementary) {
             vscode.window.showErrorMessage(`Could not parse default values from schema.`);
             switch (mode) {
                 case YAMLProcessingMode.PreviewInPanel:
@@ -342,7 +411,7 @@ export class TSLEditorExtension {
         const _currentCursorPosition = _currentActiveEditor.selection.active;
         const result = await TSLEditorPreview.renderSelection(
             _tslGenSpecs,
-            _defaults,
+            _supplementary,
             _currentActiveDocument,
             _parsedDocuments,
             _currentCursorPosition,
@@ -409,7 +478,7 @@ export class TSLEditorExtension {
                 return;
             }
             const _fileValue = `---\ndescription: "Definition of the ${_flynnNameInput} TargetExtension ${_fileNameNormalized}."\nvendor: "${_vendorName}"\nextension_name: "${_fileNameNormalized}"\n...`;
-            const _fileUri = FileSystemUtils.addPathToUri(_currentSpecs.tslgenExtensionDataFolder, _flynnName, _vendorName, _fileName);
+            const _fileUri = FileSystemUtils.addPathToUri(_currentSpecs.specs.tslgenExtensionDataFolder, _flynnName, _vendorName, _fileName);
             if (! await FileSystemUtils.createDir(FileSystemUtils.truncateFile(_fileUri))) {
                 return;
             }
@@ -438,7 +507,7 @@ export class TSLEditorExtension {
             const _primitiveClassDescriptionInput = await this.getStringInput("New Primitive Class File (2/2): Description", _description);
             const _primitivieClassDescription = _primitiveClassDescriptionInput.trim();
             const _fileValue = `---\n#Preamble\nname: "${_fileNameNormalized}"\ndescription: "${_primitivieClassDescription}"\n...`;
-            const _fileUri = FileSystemUtils.addPathToUri(_currentSpecs.tslgenPrimitiveDataFolder, _fileName);
+            const _fileUri = FileSystemUtils.addPathToUri(_currentSpecs.specs.tslgenPrimitiveDataFolder, _fileName);
             if (!
                 await FileSystemUtils.writeFile(
                     _fileUri,
@@ -469,11 +538,11 @@ export class TSLEditorExtension {
         const _pattern = (_tslToRoot === _currentTSLRoot.fsPath) ? "**" : `**${FileSystemUtils.separator}${_tslToRoot}`;
 
         const _currentSpecs = this.openedTSLGenerators[_currentTSLRoot.fsPath];
-        const _irrelevantEntries = (await FileSystemUtils.getDirectories(_currentSpecs.tslgenRootFolder, false))
-            .filter((entry) => entry.fsPath !== _currentSpecs.tslgenDataFolder.fsPath)
+        const _irrelevantEntries = (await FileSystemUtils.getDirectories(_currentSpecs.specs.tslgenRootFolder, false))
+            .filter((entry) => entry.fsPath !== _currentSpecs.specs.tslgenDataFolder.fsPath)
             .map((entry) => `${_pattern}${FileSystemUtils.separator}${FileSystemUtils.baseName(entry)}`)
             .concat(
-                (await FileSystemUtils.getFiles(_currentSpecs.tslgenRootFolder, false))
+                (await FileSystemUtils.getFiles(_currentSpecs.specs.tslgenRootFolder, false))
                     .map((fileEntry) => `${_pattern}${FileSystemUtils.separator}${FileSystemUtils.baseName(fileEntry)}`)
             );
 
@@ -490,113 +559,42 @@ export class TSLEditorExtension {
         vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
     }
 
-    public async getDiagnosticsForFile(document: vscode.Uri): Promise<vscode.Diagnostic[]> {
-        const _parsedDocuments = SerializerUtils.parseYamlDocuments(await FileSystemUtils.readFile(document));
-        if ("empty" in _parsedDocuments) {
-            return [];
-        }
-        let diagnostics: vscode.Diagnostic[] = [];
-        for (const document of _parsedDocuments) {
-            document.errors.forEach((error) => {
-                if (error.linePos) {
-                    let range: vscode.Range;
-                    if (error.linePos.length === 1) {
-                        range = new vscode.Range(error.linePos[0].line-1, error.linePos[0].col, error.linePos[0].line-1, error.linePos[0].col);
-                    } else {
-                        range = new vscode.Range(error.linePos[0].line-1, error.linePos[0].col, error.linePos[1].line-1, error.linePos[1].col);
-                    }
-                    const msg = TypeUtils.truncateFromString(error.message, /at line \d/);
-                    let diagnostic = 
-                        new vscode.Diagnostic(
-                            range,
-                            `${error.name}: ${msg}`,
-                            vscode.DiagnosticSeverity.Error,
-                        );
-                    diagnostic.source = 'yaml';
-                    diagnostic.code = error.code;
-                    diagnostics.push(diagnostic);
-                }
-             });
-             document.warnings.forEach((warning) => {
-                if (warning.linePos) {
-                    let range: vscode.Range;
-                    if (warning.linePos.length === 1) {
-                        range = new vscode.Range(warning.linePos[0].line-1, warning.linePos[0].col, warning.linePos[0].line-1, warning.linePos[0].col);
-                    } else {
-                        range = new vscode.Range(warning.linePos[0].line-1, warning.linePos[0].col, warning.linePos[1].line-1, warning.linePos[1].col);
-                    }
-                    const msg = TypeUtils.truncateFromString(warning.message, /at line \d/);
-                    let diagnostic = 
-                        new vscode.Diagnostic(
-                            range,
-                            `${warning.name}: ${msg}`,
-                            vscode.DiagnosticSeverity.Warning,
-                        );
-                    diagnostic.source = 'yaml';
-                    diagnostic.code = warning.code;
-                    diagnostics.push(diagnostic);
-                }
-             });
-        }
-        return diagnostics;
-    }
-    public async getDiagnosticsForDocument(document: vscode.TextDocument): Promise<vscode.Diagnostic[]> {
-        const _parsedDocuments = SerializerUtils.parseYamlDocuments(document.getText());
-        if ("empty" in _parsedDocuments) {
-            return [];
-        }
-        let diagnostics: vscode.Diagnostic[] = [];
-        for (const yamlDoc of _parsedDocuments) {
-            yamlDoc.errors.forEach((error) => {
-                const msg = TypeUtils.truncateFromString(error.message, /at line \d/);
-                let diagnostic = 
-                    new vscode.Diagnostic(
-                        new vscode.Range(document.positionAt(error.pos[0]), document.positionAt(error.pos[1])),
-                        `${error.name}: ${msg}`,
-                        vscode.DiagnosticSeverity.Error
-                    );
-                diagnostic.source = 'yaml';
-                diagnostic.code = error.code;
-                diagnostics.push(diagnostic);
-            });
-            yamlDoc.warnings.forEach((warning) => {
-                const msg = TypeUtils.truncateFromString(warning.message, /at line \d/);
-                let diagnostic = 
-                    new vscode.Diagnostic(
-                        new vscode.Range(document.positionAt(warning.pos[0]), document.positionAt(warning.pos[1])),
-                        `${warning.name}: ${msg}`,
-                        vscode.DiagnosticSeverity.Warning
-                    );
-                diagnostic.source = 'yaml';
-                diagnostic.code = warning.code;
-                diagnostics.push(diagnostic);
-            });
-        }
-        return diagnostics;
-    }
+    
 
     public async updateDiagnostics(collection: vscode.DiagnosticCollection, document?: vscode.TextDocument): Promise<void> {
         if (!document) {
-            const _currentTSLRoot = TSLGeneratorModel.getTSLRootFolderForCurrentActiveFile();
-            if (!_currentTSLRoot) {
-                return;
-            }
-            if ((_currentTSLRoot.fsPath in this.openedTSLGenerators)) {
-                (await FileSystemUtils.getFiles(this.openedTSLGenerators[_currentTSLRoot.fsPath].tslgenDataFolder, true, TSLGeneratorModel.tslGenDataFileExtension)).map(async (uri) => {
-                    collection.delete(uri);
-                    collection.set(uri, await this.getDiagnosticsForFile(uri));
-                });
-                
-            }
+            // const _currentTSLRoot = TSLGeneratorModel.getTSLRootFolderForCurrentActiveFile();
+            // if (!_currentTSLRoot) {
+            //     return;
+            // }
+            // const _supplementary = this.schemaSupplementary[_currentTSLRoot.fsPath];
+            // const _schema = this.schemata[_currentTSLRoot.fsPath];
+            // if ((_currentTSLRoot.fsPath in this.openedTSLGenerators)) {
+            //     (await FileSystemUtils.getFiles(this.openedTSLGenerators[_currentTSLRoot.fsPath].tslgenDataFolder, true, TSLGeneratorModel.tslGenDataFileExtension)).map(async (uri) => {
+            //         collection.delete(uri);
+            //         collection.set(uri, await this.getDiagnosticsForFile(uri, _supplementary, _schema));
+            //     });
+            // }
         } else {
-            const _currentTSLRoot = TSLGeneratorModel.getTSLRootFolder(document.uri);
-            if (!_currentTSLRoot) {
+            if (!(TSLGeneratorModel.isTSLGeneratorDataFile(document.uri))) {
+                console.log(`[TSLGen] Skipping diagnostics update for file '${document.uri.fsPath}' because it is not a TSL Generator data file.`);
                 return;
             }
-            collection.delete(document.uri);
-            collection.set(document.uri, await this.getDiagnosticsForDocument(document));
+            const _currentTSLRoot = await this.getTSLRoot(document.uri);
+            if (!_currentTSLRoot) {
+                console.log(`[TSLGen] Skipping diagnostics update for file '${document.uri.fsPath}' because it is not in a TSL Generator root folder.`);
+                return;
+            }
+            const _schema = this.openedTSLGenerators[_currentTSLRoot.fsPath].schemaData.schema;
+            if (!_schema) {
+                console.log(`[TSLGen] Skipping diagnostics update for file '${document.uri.fsPath}' because the schema for the TSL Generator root folder '${_currentTSLRoot.fsPath}' is not loaded.`);
+                return;
+            }
+            if (collection.has(document.uri)) {
+                collection.delete(document.uri);
+            }
+            collection.set(document.uri, TSLEditorFileDiagnostics.getDiagnosticsForDocument(document, _schema));
         }
-        await vscode.commands.executeCommand('vscode.executeDiagnostics', collection);
         
     }
 }

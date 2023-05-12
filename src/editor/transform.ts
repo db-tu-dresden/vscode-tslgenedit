@@ -18,10 +18,22 @@ export namespace TSLEditorTransformation {
     export const templateFileExtension = ".twig";
     export const schemaFileExtension = ".json";
 
-    export interface DefaultsFromSchema {
-        extension: SerializerUtils.JSONNode,
-        primitiveDeclaration: SerializerUtils.JSONNode,
-        primitiveDefinition: SerializerUtils.JSONNode
+    // export interface DefaultsFromSchema {
+    //     extension: SerializerUtils.JSONNode,
+    //     primitiveDeclaration: SerializerUtils.JSONNode,
+    //     primitiveDefinition: SerializerUtils.JSONNode
+    // }
+    
+
+
+    export interface SchemaSupplementary {
+        extension: {
+            defaults: SerializerUtils.JSONNode,
+        },
+        primitive: {
+            declarationDefaults: SerializerUtils.JSONNode,
+            definitionDefaults: SerializerUtils.JSONNode,
+        }
     }
 
     export async function filterTransformationTargets(transformationTargets: TransformationTarget[]): Promise<TransformationFiles[]> {
@@ -118,10 +130,10 @@ export namespace TSLEditorTransformation {
             const _transformedPrimitiveSchema = TSLGeneratorSchema.SchemaTransform.transform(_primitiveSchema);
             progress.report({ message: `Transforming primitive-class schema...` });
             const _transformedPrimitiveClassSchema = TSLGeneratorSchema.SchemaTransform.transform(_primitiveClassSchema);
-            progress.report({ message: `Combining primitive and primitive-class schema...` });
-            const _finalPrimitiveSchema = TypeUtils.extendObjects(_transformedPrimitiveSchema, _transformedPrimitiveClassSchema);
             
             if (persist) {
+                progress.report({ message: `Combining primitive and primitive-class schema...` });
+                const _finalPrimitiveSchema = TypeUtils.extendObjects(_transformedPrimitiveSchema, _transformedPrimitiveClassSchema);
                 const _targetExtensionFile: vscode.Uri = FileSystemUtils.addPathToUri(
                     transformationTarget.targetFolder, FileSystemUtils.filenameWithExtension("extensionSchema", schemaFileExtension));
                 progress.report({ message: `Writing extension schema to ${_targetExtensionFile.fsPath}...` });
@@ -151,41 +163,51 @@ export namespace TSLEditorTransformation {
         return await vscode.window.withProgress(progressOptions, progressCallback);
     }
 
-    export async function getDefaultsFromYamlSchema(schemaYaml: vscode.Uri) : Promise<DefaultsFromSchema | undefined>{
-        const _origSchema: string = await FileSystemUtils.readFile(schemaYaml);
-        const _jsonDocuments: any[] = SerializerUtils.parseYamlDocumentsAsJson(_origSchema);
-        if (_jsonDocuments.length === 0) {
-            console.error(`No valid data found in ${schemaYaml.fsPath}`);
-            return undefined;
-        }
-        if (_jsonDocuments.length !== 1) {
-            console.error(`Expected 1 yaml document in ${schemaYaml.fsPath} but found ${_jsonDocuments.length}.`);
-            return undefined;
-        }
-        const _jsonDocument = _jsonDocuments[0];
-        if (!Object.values(TSLGeneratorSchema.tslGeneratorTopLevelEntryNames).every(key => _jsonDocument.hasOwnProperty(key))) {
-            console.error("Required keys were not present in schema.");
-            return undefined;
-        }
-        const _extensionSchema = TSLGeneratorSchema.SchemaTransform.filterDefaults(_jsonDocument[TSLGeneratorSchema.tslGeneratorTopLevelEntryNames["extension"]]);
-        const _extensionDefaults = TSLGeneratorSchema.SchemaTransform.createDefaultEntryFromSchema(_extensionSchema);
+    export async function getSupplementaryFromYamlSchema(schema: TSLGeneratorSchema.Schemata): Promise<SchemaSupplementary> {
+        
+        // const _extensionRecommended = TSLGeneratorSchema.SchemaTransform.getRecommendedEntryFromSchema(schema.extension);
+        const _extensionDefaults = TSLGeneratorSchema.SchemaTransform.createDefaultEntryFromSchema(schema.extension);
         _extensionDefaults['tsl_namespace'] = TSLGeneratorModel.tslNamespace;
-        const _primitiveSchema = _jsonDocument[TSLGeneratorSchema.tslGeneratorTopLevelEntryNames["primitive"]];
-        const _primitiveDefinition = {..._primitiveSchema['optional']['definitions']['entry_type']};
+        const _primitiveSchema = {...schema.primitive};
+        // const _primitiveRecommended = TSLGeneratorSchema.SchemaTransform.getRecommendedEntryFromSchema(_primitiveSchema);
+        const _primitiveDefinition = {..._primitiveSchema['definitions']['items']};
         delete _primitiveSchema['definitions'];
         const _primitiveDeclaration = _primitiveSchema;
-        const _primitiveDefinitionFiltered = TSLGeneratorSchema.SchemaTransform.filterDefaults(_primitiveDefinition);
-        const _primitiveDeclarationFiltered = TSLGeneratorSchema.SchemaTransform.filterDefaults(_primitiveDeclaration);
+        // const _primitiveDefinitionFiltered = TSLGeneratorSchema.SchemaTransform.filterKeysConjunct(_primitiveDefinition, "default");
+        // const _primitiveDeclarationFiltered = TSLGeneratorSchema.SchemaTransform.filterKeysConjunct(_primitiveDeclaration, "default");
 
-        const _primitiveDeclarationDefaults = TSLGeneratorSchema.SchemaTransform.createDefaultEntryFromSchema(_primitiveDeclarationFiltered);
+        const _primitiveDeclarationDefaults = TSLGeneratorSchema.SchemaTransform.createDefaultEntryFromSchema(_primitiveDeclaration);
         _primitiveDeclarationDefaults['tsl_namespace'] = TSLGeneratorModel.tslNamespace;
-        const _primitiveDefinitionDefaults = TSLGeneratorSchema.SchemaTransform.createDefaultEntryFromSchema(_primitiveDefinitionFiltered);
+        const _primitiveDefinitionDefaults = TSLGeneratorSchema.SchemaTransform.createDefaultEntryFromSchema(_primitiveDefinition);
+
+        
+        
         return {
-            extension: _extensionDefaults,
-            primitiveDeclaration: _primitiveDeclarationDefaults,
-            primitiveDefinition: _primitiveDefinitionDefaults
+            extension: {
+                defaults: _extensionDefaults
+            },
+            primitive: {
+                declarationDefaults: _primitiveDeclarationDefaults,
+                definitionDefaults: _primitiveDefinitionDefaults
+            }
         };
     }
 
 
 }
+
+// export interface RecommendedEntry {
+//     keyChain: string[];
+//     value: any;
+// };
+
+// export interface SchemaSupplementaryEntry {
+//     defaults: SerializerUtils.JSONNode,
+//     recommended: RecommendedEntry
+// }
+
+// export interface SchemaSupplementary {
+//     extension: SchemaSupplementaryEntry,
+//     primitiveDeclaration: SchemaSupplementaryEntry,
+//     primitiveDefinition: SchemaSupplementaryEntry
+// }

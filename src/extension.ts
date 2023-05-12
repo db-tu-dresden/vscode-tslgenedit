@@ -5,14 +5,16 @@ import { tslEditorExtension } from './editor/editor_extension';
 import { TSLEditorAutoComplete } from './editor/autocomplete';
 import { YAMLProcessingMode } from './editor/enums';
 import * as fs from 'fs';
+import { FileSystemUtils } from './utils/files';
 
 // let tslPreviewPanel: vscode.WebviewPanel | undefined;
 
 let tslTerminal: vscode.Terminal | undefined;
-let tslgenDiagnosticCollection : vscode.DiagnosticCollection = vscode.languages.createDiagnosticCollection('TSLGen');
+let tslgenDiagnosticCollection : vscode.DiagnosticCollection;
 
 export async function activate(context: vscode.ExtensionContext) {
     tslEditorExtension.update();
+    tslgenDiagnosticCollection = vscode.languages.createDiagnosticCollection('TSLGen');
 
     const provider = new TSLEditorPreview.TSLGenViewProvider(context.extensionUri, context);
 
@@ -94,12 +96,39 @@ export async function activate(context: vscode.ExtensionContext) {
     });
 
     vscode.workspace.onDidChangeTextDocument(async (event) => {
+        console.log(`[TSLGen] Updating diagnostics in onDidChangeTextDocument for ${event.document.uri.fsPath}`);
         await tslEditorExtension.updateDiagnostics(tslgenDiagnosticCollection, event.document);
     });
 
     vscode.workspace.onDidOpenTextDocument(async (event) => {
+        console.log(`[TSLGen] Updating diagnostics in onDidOpenTextDocument for ${event.uri.fsPath}`);
         await tslEditorExtension.updateDiagnostics(tslgenDiagnosticCollection, event);
     });
+    
+    // vscode.window.onDidChangeActiveTextEditor(async (event) => {
+    //     if(event) {
+    //         if (tslgenDiagnosticCollection.has(event.document.uri)) {
+    //             tslgenDiagnosticCollection.delete(event.document.uri);
+    //         }
+    //     }
+    // });
+    // vscode.window.tabGroups.all.forEach(async (tabGroup) => {
+    //     tabGroup.tabs.forEach(async (tab) => {  
+    //         if (tab instanceof vscode.TabInputText) {
+    //             tab.input
+    //         }
+    //     });
+    // };
+    // vscode.window.visibleTextEditors.forEach(async (editor) => {
+        // console.log(`[TSLGen] Updating diagnostics in loop for ${editor.document.uri.fsPath}`);
+        // await tslEditorExtension.updateDiagnostics(tslgenDiagnosticCollection, editor.document);
+    // });
+    
+    
+    for (const document of vscode.workspace.textDocuments) {
+        console.log(`[TSLGen] Updating diagnostics in loop for ${document.uri.fsPath}`);
+        await tslEditorExtension.updateDiagnostics(tslgenDiagnosticCollection, document);
+    }
 
     // context.subscriptions.push(vscode.languages.registerContextMenuProvider)
     // vscode.commands.executeCommand('workbench.view.explorer');

@@ -31,6 +31,11 @@ export namespace TSLGeneratorTemplate {
             const substituteTernary2: string = "{% set \$<varName> = (\$<condition>) ? \$<ifpart> : \$<elsepart> %}";
             const matcherFilterIndent: RegExp = new RegExp(`${jinjaStartBlockLogic}filter\\s*indent(.*)${jinjaEndBlockLogic}(\n)?(?<innerBlock>.*?)(\\s)?${jinjaStartBlockLogic}endfilter${jinjaEndBlockLogic}`, 'gms');
             const substituteFilterIndent: string = "\$<innerBlock>";
+            const isNotEmpty: RegExp = new RegExp("(\\s*\\|\\s*length > 0)", 'gm');
+            const isNotEmptySubstitute: string = " is not empty";
+            const isEmpty: RegExp = new RegExp("(\\s*\\|\\s*length == 0)", 'gm');
+            const isEmptySubstitute: string = " is empty";
+
             export function transformNamespace(input: string): string {
                 const matchesNamespace = Array.from(input.matchAll(matcherNamespace));
                 if (matchesNamespace.length === 0) {
@@ -102,6 +107,10 @@ export namespace TSLGeneratorTemplate {
             export function transformFilterIndent(input: string): string {
                 return input.replace(matcherFilterIndent, substituteFilterIndent);
             }
+
+            export function transformEmpty(input: string): string {
+                return input.replace(isNotEmpty, isNotEmptySubstitute).replace(isEmpty, isEmptySubstitute);
+            }
         }
         export function transform(input: string): string {
             try {
@@ -111,6 +120,7 @@ export namespace TSLGeneratorTemplate {
                 output = details.transformBool(output);
                 output = details.transformTernary(output);
                 output = details.transformFilterIndent(output);
+                output = details.transformEmpty(output);
                 return output;
             } catch (e) {
                 console.error(e);

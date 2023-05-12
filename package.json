@@ -126,7 +126,7 @@
           "group": "1_modification",
           "when": "(resourceLangId == yaml) && editorTextFocus"
         }
-      ]      
+      ]
     },
     "submenus": [
       {
@@ -136,6 +136,7 @@
     ]
   },
   "dependencies": {
+    "async-mutex": "^0.4.0",
     "copy-webpack-plugin": "^11.0.0",
     "highlight.js": "^11.7.0",
     "twing": "^6.0.0-alpha.1",

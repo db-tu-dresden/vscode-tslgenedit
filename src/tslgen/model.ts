@@ -4,6 +4,8 @@ import * as yaml from 'yaml';
 import { FileSystemUtils } from '../utils/files';
 import { EditorUtils } from '../utils/vscode_editor';
 import { SerializerUtils } from '../utils/serialize';
+import { TSLGeneratorSchema } from './schema';
+import { TSLEditorTransformation } from '../editor/transform';
 
 export namespace TSLGeneratorModel {
     export const tslNamespace: string = "tsl";
@@ -60,25 +62,8 @@ export namespace TSLGeneratorModel {
     }
 
     export function isTSLGeneratorDataFile(currentFile: vscode.Uri | string): boolean {
-        const _currentFile: vscode.Uri = FileSystemUtils.toUri(currentFile);
-        const _currentFolder: vscode.Uri = FileSystemUtils.truncateFile(_currentFile);
-        if (FileSystemUtils.containsAny(_currentFolder, primitiveDataFolderName, extensionDataFolderName)) {
-            const _currentDataFolder = FileSystemUtils.moveUpTo(_currentFolder, primitiveDataFolderName, extensionDataFolderName);
-            if (_currentDataFolder) {
-                const _tslGenDataFolder = FileSystemUtils.moveUp(_currentDataFolder, 1);
-                if (_tslGenDataFolder) {
-                    if (FileSystemUtils.baseNameEqual(_tslGenDataFolder, tslGenDataFolderName)) {
-                        return true;
-                    }
-                }
-            }
-        }
-        return false;
-    }
-
-    export async function getTSLGeneratorModelForCurrentActiveFile(): Promise<TSLGeneratorSpecs | undefined> {
-        if (EditorUtils.isActiveEditor()) {
-            const _currentFile: vscode.Uri = EditorUtils.getUriOfActiveEditor() as vscode.Uri;
+        if (FileSystemUtils.getFileExtension(currentFile) === tslGenDataFileExtension) {
+            const _currentFile: vscode.Uri = FileSystemUtils.toUri(currentFile);
             const _currentFolder: vscode.Uri = FileSystemUtils.truncateFile(_currentFile);
             if (FileSystemUtils.containsAny(_currentFolder, primitiveDataFolderName, extensionDataFolderName)) {
                 const _currentDataFolder = FileSystemUtils.moveUpTo(_currentFolder, primitiveDataFolderName, extensionDataFolderName);
@@ -86,27 +71,50 @@ export namespace TSLGeneratorModel {
                     const _tslGenDataFolder = FileSystemUtils.moveUp(_currentDataFolder, 1);
                     if (_tslGenDataFolder) {
                         if (FileSystemUtils.baseNameEqual(_tslGenDataFolder, tslGenDataFolderName)) {
-                            const _tslGenFolder = FileSystemUtils.moveUp(_tslGenDataFolder, 1);
-                            const _tslSchemaFile = FileSystemUtils.addPathToUri(_tslGenFolder, ...FileSystemUtils.split(schemaFileFolder), schemaFileName);
-                            if (await FileSystemUtils.fileExists(_tslSchemaFile)) {
-                                const _tslTemplateFolder = FileSystemUtils.addPathToUri(_tslGenFolder, ...FileSystemUtils.split(templateFilesFolder));
-                                if (await FileSystemUtils.isDirectory(_tslTemplateFolder)) {
-                                    return {
-                                        tslgenRootFolder: _tslGenFolder,
-                                        tslgenDataFolder: _tslGenDataFolder,
-                                        tslgenPrimitiveDataFolder: FileSystemUtils.addPathToUri(_tslGenDataFolder, primitiveDataFolderName),
-                                        tslgenExtensionDataFolder: FileSystemUtils.addPathToUri(_tslGenDataFolder, extensionDataFolderName),
-                                        tslgenDataSchemaFile: _tslSchemaFile,
-                                        tslgenTemplateRootFolder: _tslTemplateFolder,
-                                        tslgenTemplateFilesFolders: await FileSystemUtils.subdirectories(_tslTemplateFolder, tslGenTemplateFileExtension),
-                                        tslgenTemplateFiles: await FileSystemUtils.iterFiles(_tslTemplateFolder, tslGenTemplateFileExtension)
-                                    };
-                                }
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    export async function getTSLGeneratorModelForFile(_currentFile: vscode.Uri): Promise<TSLGeneratorSpecs | undefined> {
+        const _currentFolder: vscode.Uri = FileSystemUtils.truncateFile(_currentFile);
+        if (FileSystemUtils.containsAny(_currentFolder, primitiveDataFolderName, extensionDataFolderName)) {
+            const _currentDataFolder = FileSystemUtils.moveUpTo(_currentFolder, primitiveDataFolderName, extensionDataFolderName);
+            if (_currentDataFolder) {
+                const _tslGenDataFolder = FileSystemUtils.moveUp(_currentDataFolder, 1);
+                if (_tslGenDataFolder) {
+                    if (FileSystemUtils.baseNameEqual(_tslGenDataFolder, tslGenDataFolderName)) {
+                        const _tslGenFolder = FileSystemUtils.moveUp(_tslGenDataFolder, 1);
+                        const _tslSchemaFile = FileSystemUtils.addPathToUri(_tslGenFolder, ...FileSystemUtils.split(schemaFileFolder), schemaFileName);
+                        if (await FileSystemUtils.fileExists(_tslSchemaFile)) {
+                            const _tslTemplateFolder = FileSystemUtils.addPathToUri(_tslGenFolder, ...FileSystemUtils.split(templateFilesFolder));
+                            if (await FileSystemUtils.isDirectory(_tslTemplateFolder)) {
+                                return {
+                                    tslgenRootFolder: _tslGenFolder,
+                                    tslgenDataFolder: _tslGenDataFolder,
+                                    tslgenPrimitiveDataFolder: FileSystemUtils.addPathToUri(_tslGenDataFolder, primitiveDataFolderName),
+                                    tslgenExtensionDataFolder: FileSystemUtils.addPathToUri(_tslGenDataFolder, extensionDataFolderName),
+                                    tslgenDataSchemaFile: _tslSchemaFile,
+                                    tslgenTemplateRootFolder: _tslTemplateFolder,
+                                    tslgenTemplateFilesFolders: await FileSystemUtils.subdirectories(_tslTemplateFolder, tslGenTemplateFileExtension),
+                                    tslgenTemplateFiles: await FileSystemUtils.iterFiles(_tslTemplateFolder, tslGenTemplateFileExtension)
+                                };
                             }
                         }
                     }
-                }                
-            }
+                }
+            }                
+        }
+    }
+
+    export async function getTSLGeneratorModelForCurrentActiveFile(): Promise<TSLGeneratorSpecs | undefined> {
+        if (EditorUtils.isActiveEditor()) {
+            const _currentFile: vscode.Uri = EditorUtils.getUriOfActiveEditor() as vscode.Uri;
+            return await getTSLGeneratorModelForFile(_currentFile);
         }
         return undefined;
     }
