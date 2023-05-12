@@ -53,17 +53,28 @@ Generate the necessary code for a single primitive and execute associated tests.
 
 - /
 
-### 0.0.1
+## Version History
 
-Initial release.
+### 0.1.2
 
-### 0.0.2
+- Fixed preview (escaped html tags)
+- Fixed twig template generation
+- Improved generation (generator is started once and subsequently asked to generate only a portion)
+- Added Diagnostics
 
-Improved Preview.
+### 0.1.1
 
-### 0.0.3
+- Added Building and Testing capabilities
+- Improved auto-completion
 
-Refactored Library name from TVL to TSL.
+### 0.1.0
+
+- Preview rendering works for primitive-declaration, primitive-definition(s) and extension
+
+### 0.0.5
+
+- Added Sorting of Primitives in a TSL Primitive Data File.
+- Added Formating a TSL Data File.
 
 ### 0.0.4
 
@@ -71,22 +82,20 @@ Refactored Library name from TVL to TSL.
 - Added command to create new data files.
 - Optimized Preview rendering.
 
-### 0.0.5
+### 0.0.3
 
-- Added Sorting of Primitives in a TSL Primitive Data File.
-- Added Formating a TSL Data File.
+- Refactored Library name from TVL to TSL.
 
-### 0.1.0
+### 0.0.2
 
-- Preview rendering works for primitive-declaration, primitive-definition(s) and extension
+- Improved Preview.
 
-### 0.1.1
+### 0.0.1
 
-- Added Building and Testing capabilities
-- Improved auto-completion
+- Initial release.
 
 
-### Acknowledgments
+## Acknowledgments
 
 Thanks to Alexander Krause for getting the web view and rendering up and running. 
 

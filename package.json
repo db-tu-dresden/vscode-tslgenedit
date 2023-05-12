@@ -2,7 +2,7 @@
   "name": "tslgen-edit",
   "displayName": "TSLGen-Editor",
   "description": "VSCode Editor Extension for editing TSL-Generator data files.",
-  "version": "0.0.6",
+  "version": "0.1.2",
   "publisher": "DBTUD",
   "engines": {
     "vscode": "^1.77.0"
@@ -74,17 +74,18 @@
         "category": "TSL-Generator"
       },
       {
-        "command": "tslgen-edit.generate-with-daemon",
-        "title": "Send some text to a dummy child process",
-        "category": "TSL-Generator"
-      },
-      {
         "command": "tslgen-edit.close_daemon",
         "title": "Close the dummy connection",
         "category": "TSL-Generator"
       }
     ],
     "keybindings": [
+      {
+        "command": "tslgen-edit.buildAndTest",
+        "key": "ctrl+alt+t",
+        "mac": "cmd+alt+t",
+        "when": "editorTextFocus"
+      },
       {
         "command": "tslgen-edit.preview",
         "key": "ctrl+alt+p",

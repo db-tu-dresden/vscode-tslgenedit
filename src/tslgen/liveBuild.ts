@@ -21,26 +21,22 @@ export namespace TSLGenDaemon {
                 const progressOptions = { location: vscode.ProgressLocation.Notification, title: `Starting TSLGen as daemon...` };
                 const progressCallback = async (progress: vscode.Progress<{ message?: string; }>) => {
                     let pyPath = FileSystemUtils.joinPath(tslPwd, "main.py");
-
-                    console.log(`Spawning for: ${pyPath}, outDir is: ${tslPwd}/${tslTempBuildDir}`);
-                    console.log(`Spawn command: python3 ${[`${pyPath}`, "-o", `${tslPwd}/${tslTempBuildDir}`, "-d", "-s"].join(" ")}`)
-
                     generator_daemon = spawn(`python3`, [`${pyPath}`, "-o", `${tslPwd}/${tslTempBuildDir}`, "-d", "-s"]);
                     generator_daemon.stdout?.on('data', (data) => {
-                        console.log(`stdout: ${data}`);
+                        // console.log(`stdout: ${data}`);
                         if (data.includes("Ready") || data.includes("Done")) {
-                            console.log("Generator is ready again");
+                            // console.log("Generator is ready again");
                             generator_idle = true;
                         }
                     });
 
                     generator_daemon.stderr?.on('data', (data) => {
-                        console.error(`stderr: ${data}`);
+                        // console.error(`stderr: ${data}`);
                         generator_idle = true;
                     });
 
                     generator_daemon.on('close', (code) => {
-                        console.log(`TSLGen daemon exited with code ${code}`);
+                        // console.log(`TSLGen daemon exited with code ${code}`);
                     });
                 };
                 return await vscode.window.withProgress(progressOptions, progressCallback);
@@ -65,7 +61,6 @@ export namespace TSLGenDaemon {
             const progressOptions = { location: vscode.ProgressLocation.Notification, title: `TSLGen daemon: Generating...` };
             const progressCallback = async (progress: vscode.Progress<{ message?: string; }>) => {
                 generator_idle = false;
-                console.log(`{"lscpu_flags":[${local_lscpu_flags}], "primitives": [${_data.primitive_name}]}\n`)
                 generator_daemon?.stdin?.write(`{"lscpu_flags":[${local_lscpu_flags}], "primitives": [\"${_data.primitive_name}\"]}\n`);
                 while (!generator_idle) {
                     await new Promise(f => setTimeout(f, 10));
@@ -90,25 +85,25 @@ export namespace TSLGenDaemon {
 
     export function checkTerminalState( terminal: vscode.Terminal ) {
         if (terminal.name === TSL_TERMINAL_IDENT) {
-            console.log("Disposing TSL Terminal");
+            // console.log("Disposing TSL Terminal");
             tslTerminal?.dispose();
             tslTerminal = undefined;
         }
     }
 
     export function killDaemon() {
-        console.log("Closing child process...");
+        // console.log("Closing child process...");
         generator_daemon?.kill("SIGINT");
         generator_daemon = undefined;
     }
 
     export function tearDown() {
-        console.log("TSLGenDaemon: Teardown...");
+        // console.log("TSLGenDaemon: Teardown...");
         if (tslTerminal) {
             tslTerminal.dispose();
         }
         if (generator_daemon) {
-            console.log("Terminating TSLGen daemon.");
+            // console.log("Terminating TSLGen daemon.");
             generator_daemon?.kill("SIGINT");
             generator_daemon = undefined;
         }
