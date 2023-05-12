@@ -559,43 +559,36 @@ export class TSLEditorExtension {
         vscode.commands.executeCommand("workbench.files.action.refreshFilesExplorer");
     }
 
-    
-
-    public async updateDiagnostics(collection: vscode.DiagnosticCollection, document?: vscode.TextDocument): Promise<void> {
-        if (!document) {
-            // const _currentTSLRoot = TSLGeneratorModel.getTSLRootFolderForCurrentActiveFile();
-            // if (!_currentTSLRoot) {
-            //     return;
-            // }
-            // const _supplementary = this.schemaSupplementary[_currentTSLRoot.fsPath];
-            // const _schema = this.schemata[_currentTSLRoot.fsPath];
-            // if ((_currentTSLRoot.fsPath in this.openedTSLGenerators)) {
-            //     (await FileSystemUtils.getFiles(this.openedTSLGenerators[_currentTSLRoot.fsPath].tslgenDataFolder, true, TSLGeneratorModel.tslGenDataFileExtension)).map(async (uri) => {
-            //         collection.delete(uri);
-            //         collection.set(uri, await this.getDiagnosticsForFile(uri, _supplementary, _schema));
-            //     });
-            // }
-        } else {
-            if (!(TSLGeneratorModel.isTSLGeneratorDataFile(document.uri))) {
-                console.log(`[TSLGen] Skipping diagnostics update for file '${document.uri.fsPath}' because it is not a TSL Generator data file.`);
-                return;
-            }
-            const _currentTSLRoot = await this.getTSLRoot(document.uri);
+    public async updateDiagnostics(collection: vscode.DiagnosticCollection, document: vscode.TextDocument): Promise<void> {
+        if (!(TSLGeneratorModel.isTSLGeneratorDataFile(document.uri))) {
+            return;
+        }
+        const _currentTSLRoot = await this.getTSLRoot(document.uri);
+        if (!_currentTSLRoot) {
+            return;
+        }
+        const _schema = this.openedTSLGenerators[_currentTSLRoot.fsPath].schemaData.schema;
+        if (!_schema) {
+            return;
+        }
+        collection.set(document.uri, TSLEditorFileDiagnostics.getDiagnosticsForTextDocument(document, _schema));
+    }
+    public async updateDiagnosticsForAll(collection: vscode.DiagnosticCollection): Promise<void> {
+        const progressOptions = { location: vscode.ProgressLocation.Notification, title: `Collecting Diagnostics...` };
+        const progressCallback = async (progress: vscode.Progress<{ message?: string; }>) => {
+            progress.report({ message: `Searching for TSL Root...` });
+            const _currentTSLRoot = await this.getCurrentTSLRoot();
             if (!_currentTSLRoot) {
-                console.log(`[TSLGen] Skipping diagnostics update for file '${document.uri.fsPath}' because it is not in a TSL Generator root folder.`);
                 return;
             }
             const _schema = this.openedTSLGenerators[_currentTSLRoot.fsPath].schemaData.schema;
-            if (!_schema) {
-                console.log(`[TSLGen] Skipping diagnostics update for file '${document.uri.fsPath}' because the schema for the TSL Generator root folder '${_currentTSLRoot.fsPath}' is not loaded.`);
-                return;
-            }
-            if (collection.has(document.uri)) {
-                collection.delete(document.uri);
-            }
-            collection.set(document.uri, TSLEditorFileDiagnostics.getDiagnosticsForDocument(document, _schema));
-        }
-        
+            await Promise.all((await FileSystemUtils.getFiles(this.openedTSLGenerators[_currentTSLRoot.fsPath].specs.tslgenDataFolder, true, TSLGeneratorModel.tslGenDataFileExtension)).map(async (uri) => {
+                progress.report({ message: `Getting diagnostics for ${uri}...` });
+                const resultDiagnostics = await TSLEditorFileDiagnostics.getDiagnosticsForFile(uri, _schema);
+                collection.set(uri, resultDiagnostics);
+            }));
+        };
+        return await vscode.window.withProgress(progressOptions, progressCallback);
     }
 }
 export const tslEditorExtension = TSLEditorExtension.getInstance();

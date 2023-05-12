@@ -182,9 +182,6 @@ export namespace TSLGeneratorSchema {
             function impl(currentSchema: SerializerUtils.JSONNode, keyChain: string[] = []): RecommendedEntry[] {
                 const result: RecommendedEntry[] = [];
                 for (const key in currentSchema) {
-                    if (key==="definitions") {
-                        console.log("NOW");
-                    }
                     const value = currentSchema[key];
                     if (value && typeof value === "object") {
                         if (("recommended" in currentSchema[key]) && ("default" in currentSchema[key])) {

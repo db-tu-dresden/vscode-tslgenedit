@@ -3,6 +3,8 @@ import { TSLGeneratorSchema } from "../tslgen/schema";
 import { TSLGeneratorModel } from "../tslgen/model";
 import { TypeUtils } from "../utils/types";
 import * as vscode from 'vscode';
+import { YAMLWarning } from "yaml";
+import { FileSystemUtils } from "../utils/files";
 
 export namespace TSLEditorFileDiagnostics {
 
@@ -62,83 +64,106 @@ export namespace TSLEditorFileDiagnostics {
     //     }
     //     return diagnostics;
     // }
-    export function getDiagnosticsForDocument(
-      document: vscode.TextDocument, 
-      schema: TSLGeneratorSchema.Schemata 
-  ): vscode.Diagnostic[] {
-      const _parsedDocuments = SerializerUtils.parseYamlDocuments(document.getText());
-      if ("empty" in _parsedDocuments) {
-          return [];
-      }
-      const _documentType = TSLGeneratorModel.determineFileTypeByLocation(document.uri);
-      const _schema = (_documentType === TSLGeneratorModel.TSLDataFileContentType.unknown) ? undefined : 
-          (_documentType === TSLGeneratorModel.TSLDataFileContentType.extension) ? schema.extension : schema.primitive;
-      let diagnostics: vscode.Diagnostic[] = [];
-      let idx = 0;
-      for (const yamlDoc of _parsedDocuments) {
-          yamlDoc.errors.forEach((error) => {
-              const msg = TypeUtils.truncateFromString(error.message, /at line \d/);
-              let diagnostic = 
-                  new vscode.Diagnostic(
-                      new vscode.Range(document.positionAt(error.pos[0]), document.positionAt(error.pos[1])),
-                      `${error.name}: ${msg}`,
-                      vscode.DiagnosticSeverity.Error
-                  );
-              diagnostic.source = 'yaml';
-              diagnostic.code = error.code;
-              diagnostics.push(diagnostic);
-          });
-          yamlDoc.warnings.forEach((warning) => {
-              const msg = TypeUtils.truncateFromString(warning.message, /at line \d/);
-              let diagnostic = 
-                  new vscode.Diagnostic(
-                      new vscode.Range(document.positionAt(warning.pos[0]), document.positionAt(warning.pos[1])),
-                      `${warning.name}: ${msg}`,
-                      vscode.DiagnosticSeverity.Warning
-                  );
-              diagnostic.source = 'yaml';
-              diagnostic.code = warning.code;
-              diagnostics.push(diagnostic);
-          });
-          if (_schema) {
-              if (idx === 0) {
-                  idx++;
-                  if (yamlDoc.contents) {
-                      for (const yamlDiagnostic of SerializerUtils.validateYamlDocument(yamlDoc.contents, schema.primitiveClass)) {
-                          const severity = (yamlDiagnostic.type === SerializerUtils.YamlDiagnosticType.error) ? vscode.DiagnosticSeverity.Error : vscode.DiagnosticSeverity.Information;
-                          const errorName = (yamlDiagnostic.type === SerializerUtils.YamlDiagnosticType.error) ? "YAMLSchemaError" : "YAMLSchemaHint";
-                          let diagnostic = 
-                              new vscode.Diagnostic(
-                                  new vscode.Range(document.positionAt(yamlDiagnostic.node.range[0]), document.positionAt(yamlDiagnostic.node.range[0]+1)),
-                                  `${errorName}: ${yamlDiagnostic.message}`,
-                                  severity
-                              );
-                          diagnostic.source = 'yaml';
-                          diagnostic.code = yamlDiagnostic.code;
-                          diagnostics.push(diagnostic);
-                      }
-                  }
-              } else {
-                  if (yamlDoc.contents) {
-                      for (const yamlDiagnostic of SerializerUtils.validateYamlDocument(yamlDoc.contents, _schema)) {
-                          const severity = (yamlDiagnostic.type === SerializerUtils.YamlDiagnosticType.error) ? vscode.DiagnosticSeverity.Error : vscode.DiagnosticSeverity.Information;
-                          const errorName = (yamlDiagnostic.type === SerializerUtils.YamlDiagnosticType.error) ? "YAMLSchemaError" : "YAMLSchemaHint";
-                          let diagnostic = 
-                              new vscode.Diagnostic(
-                                  new vscode.Range(document.positionAt(yamlDiagnostic.node.range[0]), document.positionAt(yamlDiagnostic.node.range[0]+1)),
-                                  `${errorName}: ${yamlDiagnostic.message}`,
-                                  severity
-                              );
-                          diagnostic.source = 'yaml';
-                          diagnostic.code = yamlDiagnostic.code;
-                          diagnostics.push(diagnostic);
-                      }
-                  }
-              }
-              
-          }
-      }   
-      return diagnostics;
-  }
+
+    function createYamlParserDiagnostic(
+        diagnosticType: SerializerUtils.YamlDiagnosticType,
+        severity: vscode.DiagnosticSeverity,
+        documentOfOrigin: FileSystemUtils.FileHandle
+    ) {
+        const range = documentOfOrigin.getRange(diagnosticType.pos[0], diagnosticType.pos[1]);
+        let diagnostic = new vscode.Diagnostic(
+            range,
+            `${diagnosticType.name}: ${TypeUtils.truncateFromString(diagnosticType.message, /at line \d/)}`,
+            severity
+        );
+        diagnostic.source = 'yaml';
+        diagnostic.code = diagnosticType.code;
+        return diagnostic;
+    }
+    function createCustomYamlParserDiagnostic(
+        diagnosticType: SerializerUtils.YamlDiagnostic,
+        documentOfOrigin: FileSystemUtils.FileHandle
+    ) {
+        const severity = (diagnosticType.type === SerializerUtils.YamlDiagnosticCustomType.error) ? vscode.DiagnosticSeverity.Error : vscode.DiagnosticSeverity.Information;
+        const range = documentOfOrigin.getRange(diagnosticType.node.range[0], diagnosticType.node.range[0] + 1);
+        let diagnostic = new vscode.Diagnostic(
+            range,
+            `${diagnosticType.type.valueOf()}: ${diagnosticType.message}`,
+            severity
+        );
+        diagnostic.source = 'yaml';
+        diagnostic.code = diagnosticType.code;
+        return diagnostic;
+    }
+
+    function getDiagnosticsForYamlDocuments(
+        yamlDocuments: SerializerUtils.YamlDocument[],
+        schema: TSLGeneratorSchema.Schemata,
+        documentOfOrigin: FileSystemUtils.FileHandle
+    ) {
+        const _uri = documentOfOrigin.getUri();
+        const _documentType = TSLGeneratorModel.determineFileTypeByLocation(_uri);
+        const _schema = (_documentType === TSLGeneratorModel.TSLDataFileContentType.unknown) ? undefined :
+            (_documentType === TSLGeneratorModel.TSLDataFileContentType.extension) ? schema.extension : schema.primitive;
+        if (!_schema) {
+            return [];
+        }
+        let diagnostics: vscode.Diagnostic[] = [];
+        let idx = 0;
+        for (const yamlDoc of yamlDocuments) {
+            yamlDoc.errors.forEach((error) => {
+                diagnostics.push(createYamlParserDiagnostic(error, vscode.DiagnosticSeverity.Error, documentOfOrigin));
+            });
+            yamlDoc.warnings.forEach((warning) => {
+                diagnostics.push(createYamlParserDiagnostic(warning, vscode.DiagnosticSeverity.Warning, documentOfOrigin));
+            });
+            if (yamlDoc.contents) {
+                if (_documentType === TSLGeneratorModel.TSLDataFileContentType.extension) {
+                    for (const yamlDiagnostic of SerializerUtils.validateYamlDocument(yamlDoc.contents, _schema)) {
+                        diagnostics.push(createCustomYamlParserDiagnostic(yamlDiagnostic, documentOfOrigin));
+                    }
+                } else {
+                    if (idx === 0) {
+                        idx++;
+                        for (const yamlDiagnostic of SerializerUtils.validateYamlDocument(yamlDoc.contents, schema.primitiveClass)) {
+                            diagnostics.push(createCustomYamlParserDiagnostic(yamlDiagnostic, documentOfOrigin));
+                        }
+                    } else {
+                        for (const yamlDiagnostic of SerializerUtils.validateYamlDocument(yamlDoc.contents, _schema)) {
+                            diagnostics.push(createCustomYamlParserDiagnostic(yamlDiagnostic, documentOfOrigin));
+                        }
+                    }
+                }
+            }
+        }
+        return diagnostics;
+    }
+
+    export function getDiagnosticsForTextDocument(
+        document: vscode.TextDocument,
+        schema: TSLGeneratorSchema.Schemata
+    ): vscode.Diagnostic[] {
+        const _parsedDocuments = SerializerUtils.parseYamlDocuments(document.getText());
+        if ("empty" in _parsedDocuments) {
+            return [];
+        }
+        const fileHandle = new FileSystemUtils.FileHandle();
+        fileHandle.setDocument(document);
+        return getDiagnosticsForYamlDocuments(_parsedDocuments, schema, fileHandle);
+    }
+
+    export async function getDiagnosticsForFile(
+        fileUri: vscode.Uri,
+        schema: TSLGeneratorSchema.Schemata
+    ): Promise<vscode.Diagnostic[]> {
+        const _text = await FileSystemUtils.readFile(fileUri);
+        const _parsedDocuments = SerializerUtils.parseYamlDocuments(_text);
+        if ("empty" in _parsedDocuments) {
+            return [];
+        }
+        const fileHandle = new FileSystemUtils.FileHandle();
+        fileHandle.setContent(fileUri, _text);
+        return getDiagnosticsForYamlDocuments(_parsedDocuments, schema, fileHandle);
+    }
 
 }

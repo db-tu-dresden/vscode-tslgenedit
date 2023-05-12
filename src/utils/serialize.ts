@@ -4,6 +4,7 @@ import { TextDocument, Position } from 'vscode';
 export namespace SerializerUtils {
     export type YamlDocument = yaml.Document.Parsed<yaml.ParsedNode>;
     export type YamlNode = yaml.ParsedNode;
+    export type YamlDiagnosticType = yaml.YAMLWarning | yaml.YAMLError;
     export interface JSONNode {
         [key: string]: any;
     }
@@ -16,9 +17,9 @@ export namespace SerializerUtils {
         });
     }
 
-    export enum YamlDiagnosticType {
-        error = "error",
-        hint = "hint"
+    export enum YamlDiagnosticCustomType {
+        error = "YAMLSchemaError",
+        hint = "YAMLSchemaHint"
     }
 
     export enum YamlFieldConstraint {
@@ -34,7 +35,7 @@ export namespace SerializerUtils {
         default?: any
     }
     export interface YamlDiagnostic {
-        type: YamlDiagnosticType;
+        type: YamlDiagnosticCustomType;
         code: string;
         message: string;
         node: YamlNode;
@@ -63,13 +64,13 @@ export namespace SerializerUtils {
             for (const [key, value] of Object.entries(schema)) {
                 if (!(_yamlDocument.has(key))) {
                     if (((value as any).hasOwnProperty("minValue")) && ((value as any)["minValue"] === 1)) {
-                        yield { type: YamlDiagnosticType.error, code: 'KEY_ERROR', message: `Missing required field ${key}`, node: yamlDocument as YamlNode};
+                        yield { type: YamlDiagnosticCustomType.error, code: 'KEY_ERROR', message: `Missing required field ${key}`, node: yamlDocument as YamlNode};
                     } else if (((value as any).hasOwnProperty("minValue")) && ((value as any)["minValue"] === 0) && ((value as any).hasOwnProperty("recommended")) && ((value as any)["recommended"] === true)) {
-                        yield { type: YamlDiagnosticType.hint, code: 'KEY_WARNING', message: `Missing recommended field ${key}`, node: yamlDocument as YamlNode};
+                        yield { type: YamlDiagnosticCustomType.hint, code: 'KEY_WARNING', message: `Missing recommended field ${key}`, node: yamlDocument as YamlNode};
                     }
                 } else {
                     if (((value as any).hasOwnProperty("minValue")) && ((value as any)["minValue"] === 0) && ((value as any).hasOwnProperty("recommended")) && ((value as any)["recommended"] === true) && ((value as any).hasOwnProperty("default") && ((value as any)["default"] === _yamlDocument.get(key)))) {
-                        yield { type: YamlDiagnosticType.hint, code: 'VALUE_WARNING', message: `Recommended field ${key} is set to default value`, node: yamlDocument as YamlNode};
+                        yield { type: YamlDiagnosticCustomType.hint, code: 'VALUE_WARNING', message: `Recommended field ${key} is set to default value`, node: yamlDocument as YamlNode};
                     }
                     if ((value as any).hasOwnProperty("items")) {
                         yield * validateYamlDocument(_yamlDocument.get(key) as YamlNode, (value as any)["items"] as any);
