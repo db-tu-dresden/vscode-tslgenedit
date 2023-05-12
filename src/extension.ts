@@ -129,6 +129,7 @@ export async function activate(context: vscode.ExtensionContext) {
         console.log(`[TSLGen] Updating diagnostics in loop for ${document.uri.fsPath}`);
         await tslEditorExtension.updateDiagnostics(tslgenDiagnosticCollection, document);
     }
+    new vscode.Position
 
     // context.subscriptions.push(vscode.languages.registerContextMenuProvider)
     // vscode.commands.executeCommand('workbench.view.explorer');
