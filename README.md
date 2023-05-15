@@ -51,7 +51,7 @@ Generate the necessary code for a single primitive and execute associated tests.
 
 ## Known Issues
 
-- /
+- It seems to be the case that the [Redhat Extension](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml) interferes with at least the auto-completion. So please deactivate the extension if installed for your TSLGen project.
 
 ## Version History
 
