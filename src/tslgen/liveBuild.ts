@@ -70,7 +70,7 @@ export namespace TSLGenDaemon {
             tslTerminal.show();
             tslTerminal.sendText(`cd ${tslTempDir}`);
             tslTerminal.sendText(`cmake -S ${tslTempDir} -B ${tslTempDir}/build`);
-            tslTerminal.sendText(`make -C ${tslTempDir}/build`);
+            tslTerminal.sendText(`make -j -C ${tslTempDir}/build`);
             tslTerminal.sendText(`${tslTempDir}/build/src/test/tsl_test \"[${_data.extension_name}][${_data.primitive_name}]\"`);
         } else {
             vscode.window.showInformationMessage("Build already active, please wait for it to finish.");
