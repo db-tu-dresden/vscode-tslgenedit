@@ -21,7 +21,7 @@ export namespace TSLEditorAutoComplete {
                     let _current = `${key}: `;
                     const _type = obj[key]["type"];
                     if (_type === 'string') {
-                        _current += "''";
+                        _current += '""';
                     } else if(_type === 'array') {
                         _current += "[]";
                     } else if(_type === 'dict') {
