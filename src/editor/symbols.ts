@@ -49,21 +49,40 @@ export namespace TSLEditorFileSymbols {
                             const _definition = _entry as yaml.YAMLMap<unknown, unknown>;
                             const _extensionItem = _definition.get("target_extension");
                             const _extensionFlagsItem = _definition.get("lscpu_flags");
-                            const _extensionFlags = (yaml.isCollection(_extensionFlagsItem)) ? _extensionFlagsItem.items.sort().join(", ") : `${_extensionFlagsItem}`;
+                            let _extensionFlags = (yaml.isCollection(_extensionFlagsItem)) ? _extensionFlagsItem.items.sort().join(", ") : `${_extensionFlagsItem}`;
+                            if (!_extensionFlags) {
+                                _extensionFlags = "default";
+                            }
                             if ((_extensionItem) && (_extensionFlags)) {
-                                const _concreteDefinition = `${_extensionItem} (${_extensionFlags})`;
+                                
                                 if (_definition.range) {
-                                    return new vscode.DocumentSymbol(
+                                    const range = _definition.range;
+                                    if (yaml.isCollection(_extensionItem)) {
+                                        return _extensionItem.items.map((extensionItem) => {
+                                            const _concreteDefinition = `${extensionItem} (${_extensionFlags})`;
+                                            return new vscode.DocumentSymbol(
+                                                _concreteDefinition,
+                                                '',
+                                                vscode.SymbolKind.Field,
+                                                new vscode.Range(currentDocument.positionAt(range[0]), currentDocument.positionAt(range[2])),
+                                                new vscode.Range(currentDocument.positionAt(range[0]), currentDocument.positionAt(range[2]))
+                                            );
+                                        });
+                                    } else {
+                                        const _concreteDefinition = `${_extensionItem} (${_extensionFlags})`;
+                                        return [new vscode.DocumentSymbol(
                                             _concreteDefinition,
                                             '',
                                             vscode.SymbolKind.Field,
-                                            new vscode.Range(currentDocument.positionAt(_definition.range[0]), currentDocument.positionAt(_definition.range[2])),
-                                            new vscode.Range(currentDocument.positionAt(_definition.range[0]), currentDocument.positionAt(_definition.range[2]))
-                                        );
+                                            new vscode.Range(currentDocument.positionAt(range[0]), currentDocument.positionAt(range[2])),
+                                            new vscode.Range(currentDocument.positionAt(range[0]), currentDocument.positionAt(range[2]))
+                                        )];
+                                    }
+                                    
                                 }
                             }
                         });
-                        const _definitions: vscode.DocumentSymbol[] = (await Promise.all(_definitionPromises)).filter((symbol): symbol is vscode.DocumentSymbol => symbol !== undefined);
+                        const _definitions: vscode.DocumentSymbol[] = (await Promise.all(_definitionPromises)).filter((symbol): symbol is [vscode.DocumentSymbol] => symbol !== undefined).flat();
                         if (_definitions.length > 0) {
                             _nameSymbol.children = _definitions;
                         }

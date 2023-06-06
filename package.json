@@ -2,7 +2,7 @@
   "name": "tslgen-edit",
   "displayName": "TSLGen-Editor",
   "description": "VSCode Editor Extension for editing TSL-Generator data files.",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "publisher": "DBTUD",
   "icon": "media/tsl_icon.png",
   "engines": {
