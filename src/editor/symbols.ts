@@ -61,7 +61,19 @@ export namespace TSLEditorFileSymbols {
         );
             
         return result.join(", ");
-
+    }
+    function prettifyYamlCppType(type: string): string {
+        const noTypename: string = type.replace(/typename /g, '');
+        const doubleColonIndex = noTypename.indexOf('::');
+        if (doubleColonIndex >= 0) {
+            const spaceIndex = noTypename.lastIndexOf(' ', doubleColonIndex);
+            if (spaceIndex > 0) {
+                return `${noTypename.substring(0, spaceIndex)} ${noTypename.substring(doubleColonIndex+2)}`;
+            } else {
+                return noTypename.substring(doubleColonIndex+2);
+            }
+        }
+        return noTypename;
     }
 
     export async function getTSLPrimitiveDocumentSymbols(
@@ -72,8 +84,21 @@ export namespace TSLEditorFileSymbols {
             const _primitiveNameItem = document.get("primitive_name");
             const _functorNameItem = document.get("functor_name");
             if (_primitiveNameItem) {
-                let _nameAppendix = (_functorNameItem) ? ` (overload ${_functorNameItem})` : "";
-                const _primitiveName = `${_primitiveNameItem}${_nameAppendix}`;
+                const parametersItems = document.get("parameters");
+                const parameterString = 
+                    parametersItems
+                    ?
+                        (yaml.isCollection(parametersItems) ? parametersItems.items.map((parameterItem) => {
+                            return prettifyYamlCppType(`${(parameterItem as yaml.YAMLMap<unknown, unknown>).get("ctype")}` ?? "");
+                        }) : [`${parametersItems}`]).join(", ")
+                    : "";
+                const returnsItem = document.get("returns");
+                const returnsString =
+                    returnsItem
+                    ? prettifyYamlCppType(`${(returnsItem as yaml.YAMLMap<unknown, unknown>).get("ctype")}` ?? "unknown")
+                    : "void";
+                let _overloadInfo = `(overloads: ${_primitiveNameItem})`;
+                const _primitiveName = `${(_functorNameItem)? _functorNameItem : _primitiveNameItem}(${parameterString}) => ${returnsString}  ${(_functorNameItem)? _overloadInfo : ""}`;
                 const _startPosition: vscode.Position = currentDocument.positionAt(document.range[0]);
                 const _endPosition: vscode.Position = currentDocument.positionAt(document.range[2]);
                 const _nameSymbol = new vscode.DocumentSymbol(
@@ -123,7 +148,6 @@ export namespace TSLEditorFileSymbols {
                                     if (_definition.range) {
                                         const range = _definition.range;
                                         const _concreteDefinition = `${_type} (Flags: [${_extensionFlags}])`;
-                                        console.log(_concreteDefinition);
                                         return new vscode.DocumentSymbol(
                                             _concreteDefinition,
                                             '',
