@@ -55,4 +55,38 @@ export namespace TypeUtils {
       }
       return str;
     }   
+
+    export function naturalSort(a: string, b:string): number {
+      const numRegex = /\d+/g;
+      const extractNumber = (str: string) => {
+        const matches = str.match(numRegex);
+        if (matches) {
+          return parseInt(matches[0], 10);
+        }
+        return NaN;
+      };
+      const aNum = extractNumber(a);
+      const bNum = extractNumber(b);
+      if (isNaN(aNum) && isNaN(bNum)) {
+        // console.log("\t" + a.localeCompare(b));
+        return a.localeCompare(b);
+      } else if (isNaN(aNum)) {
+        // console.log("\t1");
+        return 1;
+      } else if (isNaN(bNum)) {
+        // console.log("\t-1");
+        return -1;
+      } else {
+        if (aNum < bNum) {
+          // console.log("\t-1");
+          return -1;
+        } else if (aNum > bNum) {
+          // console.log("\t1");
+          return 1;
+        } else {
+          // console.log("\t" + a.localeCompare(b));
+          return a.localeCompare(b);
+        }
+      }
+    }
 }
