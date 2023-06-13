@@ -111,28 +111,29 @@ export namespace TSLEditorFileSymbols {
                 const _definitionsItem = document.get("definitions");
                 if (_definitionsItem) {
                     if (yaml.isCollection(_definitionsItem)) {
-                        const _definitionsByExtension = _definitionsItem.items.reduce((groups: { [key: string]: yaml.YAMLMap<unknown, unknown>[] }, item: unknown | yaml.Pair<unknown, unknown>) => {
+                        let _definitionsByExtension: { [key: string]: yaml.YAMLMap<unknown, unknown>[] } = {};
+                        _definitionsItem.items.forEach((item: unknown | yaml.Pair<unknown, unknown>) => {
                             const _definition = item as yaml.YAMLMap<unknown, unknown>;
                             const _extensionItem = _definition.get("target_extension") ?? "";
                             if (yaml.isCollection(_extensionItem)) {
                                 _extensionItem.items.forEach((extensionItem) => {
                                     const eI: string = extensionItem as string;
-                                    if (groups.hasOwnProperty(eI)) {
-                                        groups[eI].push(_definition);
+                                    if (_definitionsByExtension.hasOwnProperty(eI)) {
+                                        _definitionsByExtension[eI].push(_definition);
                                     } else {
-                                        groups[eI] = [_definition];
+                                        _definitionsByExtension[eI] = [_definition];
                                     }        
                                 });
                             } else {
                                 const eI: string = _extensionItem as string;
-                                if (groups.hasOwnProperty(eI)) {
-                                    groups[eI].push(_definition);
+                                if (_definitionsByExtension.hasOwnProperty(eI)) {
+                                    _definitionsByExtension[eI].push(_definition);
                                 } else {
-                                    groups[eI] = [_definition];
+                                    _definitionsByExtension[eI] = [_definition];
                                 }
                             }
-                            return groups;
-                          }, {});
+                            return _definitionsByExtension;
+                          });
 
                         const _definitionPromises =  Object.entries(_definitionsByExtension).map(async ([_extension, _definitions]) => {
                             const extensionDependendDefinitionsPromises = _definitions.map(async (_definition) => {
