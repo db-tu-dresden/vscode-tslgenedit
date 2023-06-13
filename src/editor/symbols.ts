@@ -48,8 +48,10 @@ export namespace TSLEditorFileSymbols {
             }
         }
         const result: string[] = [];
-        if (integerSizesBoth.length > 0) {
-            result.push(`(u)int[${integerSizesBoth.join(", ")}]`);
+        if (integerSizesBoth.length > 1) {
+            result.push(`(u)int[${integerSizesBoth.join(", ")}]_t`);
+        } else if (integerSizesBoth.length === 1) {
+            result.push(`(u)int${integerSizesBoth.join(", ")}_t`);
         }
         result.push(
             ...signeds.filter((signedT) => !toRemoveInts.includes(signedT)), 
@@ -59,14 +61,13 @@ export namespace TSLEditorFileSymbols {
         );
             
         return result.join(", ");
-        // const longest_common_substring: string = TypeUtils.longestCommonSubstring(result);
-        // console.log(longest_common_substring);
-        // return result.sort().join(", ");
+
     }
 
     export async function getTSLPrimitiveDocumentSymbols(
         currentDocument: vscode.TextDocument, documents: SerializerUtils.YamlDocument[]
     ): Promise<vscode.DocumentSymbol[]> {
+
         const _symbolPromises = documents.map(async (document) => {
             const _primitiveNameItem = document.get("primitive_name");
             const _functorNameItem = document.get("functor_name");
@@ -78,54 +79,75 @@ export namespace TSLEditorFileSymbols {
                 const _nameSymbol = new vscode.DocumentSymbol(
                     _primitiveName,
                     '',
-                    vscode.SymbolKind.Class,
+                    vscode.SymbolKind.Operator,
                     new vscode.Range(_startPosition, _endPosition),
                     new vscode.Range(_startPosition, _endPosition)
                 );
                 const _definitionsItem = document.get("definitions");
                 if (_definitionsItem) {
                     if (yaml.isCollection(_definitionsItem)) {
-                        const _definitionPromises = _definitionsItem.items.map(async (_entry) => {
-                            const _definition = _entry as yaml.YAMLMap<unknown, unknown>;
-                            const _extensionItem = _definition.get("target_extension");
-                            const _extensionFlagsItem = _definition.get("lscpu_flags");
-                            const _types = _definition.get("ctype") ?? [];
-                            const _type = (yaml.isCollection(_types)) ? prettifyTypes(_types.items) : `${_types}`;
-
-                            let _extensionFlags = (yaml.isCollection(_extensionFlagsItem)) ? _extensionFlagsItem.items.sort().join(", ") : `${_extensionFlagsItem}`;
-                            if (!_extensionFlags) {
-                                _extensionFlags = "default";
-                            }
-                            if ((_extensionItem) && (_extensionFlags)) {
-                                
-                                if (_definition.range) {
-                                    const range = _definition.range;
-                                    if (yaml.isCollection(_extensionItem)) {
-                                        return _extensionItem.items.map((extensionItem) => {
-                                            const _concreteDefinition = `${extensionItem}: <<${_extensionFlags}>> (${_type})`;
-                                            return new vscode.DocumentSymbol(
-                                                _concreteDefinition,
-                                                '',
-                                                vscode.SymbolKind.Field,
-                                                new vscode.Range(currentDocument.positionAt(range[0]), currentDocument.positionAt(range[2])),
-                                                new vscode.Range(currentDocument.positionAt(range[0]), currentDocument.positionAt(range[2]))
-                                            );
-                                        });
+                        const _definitionsByExtension = _definitionsItem.items.reduce((groups: { [key: string]: yaml.YAMLMap<unknown, unknown>[] }, item: unknown | yaml.Pair<unknown, unknown>) => {
+                            const _definition = item as yaml.YAMLMap<unknown, unknown>;
+                            const _extensionItem = _definition.get("target_extension") ?? "";
+                            if (yaml.isCollection(_extensionItem)) {
+                                _extensionItem.items.forEach((extensionItem) => {
+                                    const eI: string = extensionItem as string;
+                                    if (groups.hasOwnProperty(eI)) {
+                                        groups[eI].push(_definition);
                                     } else {
-                                        const _concreteDefinition = `${_extensionItem}: <<${_extensionFlags}>> (${_type})`;
-                                        return [new vscode.DocumentSymbol(
-                                            _concreteDefinition,
-                                            '',
-                                            vscode.SymbolKind.Field,
-                                            new vscode.Range(currentDocument.positionAt(range[0]), currentDocument.positionAt(range[2])),
-                                            new vscode.Range(currentDocument.positionAt(range[0]), currentDocument.positionAt(range[2]))
-                                        )];
-                                    }
-                                    
+                                        groups[eI] = [_definition];
+                                    }        
+                                });
+                            } else {
+                                const eI: string = _extensionItem as string;
+                                if (groups.hasOwnProperty(eI)) {
+                                    groups[eI].push(_definition);
+                                } else {
+                                    groups[eI] = [_definition];
                                 }
                             }
+                            return groups;
+                          }, {});
+
+                        const _definitionPromises =  Object.entries(_definitionsByExtension).map(async ([_extension, _definitions]) => {
+                            const extensionDependendDefinitionsPromises = _definitions.map(async (_definition) => {
+                                const _extensionFlagsItem = _definition.get("lscpu_flags");
+                                const _types = _definition.get("ctype") ?? [];
+                                const _type = (yaml.isCollection(_types)) ? prettifyTypes(_types.items) : `${_types}`;
+
+                                let _extensionFlags = (yaml.isCollection(_extensionFlagsItem)) ? _extensionFlagsItem.items.sort().join(", ") : `${_extensionFlagsItem}`;
+                                if (!_extensionFlags) {
+                                    _extensionFlags = "default";
+                                }
+                                if ((_extensionFlags)) {
+                                    if (_definition.range) {
+                                        const range = _definition.range;
+                                        const _concreteDefinition = `${_type} (Flags: [${_extensionFlags}])`;
+                                        console.log(_concreteDefinition);
+                                        return new vscode.DocumentSymbol(
+                                            _concreteDefinition,
+                                            '',
+                                            vscode.SymbolKind.Function,
+                                            new vscode.Range(currentDocument.positionAt(range[0]), currentDocument.positionAt(range[2])),
+                                            new vscode.Range(currentDocument.positionAt(range[0]), currentDocument.positionAt(range[2]))
+                                        );                                    
+                                    }
+                                }
+                            });
+                            const extensionDependendDefinitions = (await Promise.all(extensionDependendDefinitionsPromises)).filter((symbol): symbol is vscode.DocumentSymbol => symbol !== undefined);
+                            const startPos = extensionDependendDefinitions[0].range.start;
+                            const endPos = extensionDependendDefinitions[extensionDependendDefinitions.length - 1].range.end;
+                            const extensionSymbol = new vscode.DocumentSymbol(
+                                _extension,
+                                '',
+                                vscode.SymbolKind.Struct,
+                                new vscode.Range(startPos, endPos),
+                                new vscode.Range(startPos, endPos)
+                            );
+                            extensionSymbol.children = extensionDependendDefinitions;
+                            return extensionSymbol;
                         });
-                        const _definitions: vscode.DocumentSymbol[] = (await Promise.all(_definitionPromises)).filter((symbol): symbol is [vscode.DocumentSymbol] => symbol !== undefined).flat();
+                        const _definitions: vscode.DocumentSymbol[] = await Promise.all(_definitionPromises);
                         if (_definitions.length > 0) {
                             _nameSymbol.children = _definitions;
                         }
